@@ -17,6 +17,37 @@ from snla import config
 logger = logging.getLogger(__name__)
 
 
+# ---------------------------------------------------------------------------
+# TLS adapter for servers with strict/complex SSL configurations
+# (e.g. opencode.ai which requires relaxed cipher settings on some platforms)
+# ---------------------------------------------------------------------------
+
+
+def _build_tls_adapter() -> "requests.adapters.HTTPAdapter":
+    """Build a requests HTTPAdapter with a permissive TLS context.
+
+    Some LLM API endpoints use TLS configurations that trigger
+    ``SSLEOFError`` on Windows/Python combinations with stricter
+    default cipher suites.  This adapter relaxes verification to
+    ``CERT_NONE`` and lowers the OpenSSL security level to 1 so
+    that handshakes succeed.
+    """
+    import ssl
+
+    from requests.adapters import HTTPAdapter
+
+    class _TLSAdapter(HTTPAdapter):
+        def init_poolmanager(self, *args: Any, **kwargs: Any) -> None:
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            ctx.set_ciphers("DEFAULT:@SECLEVEL=1")
+            kwargs["ssl_context"] = ctx
+            return super().init_poolmanager(*args, **kwargs)
+
+    return _TLSAdapter()
+
+
 class LLMError(Exception):
     """Raised when all LLM backends fail."""
 
@@ -50,6 +81,7 @@ class LLMClient:
         self.debug = config.DEBUG
 
         self._session = requests.Session()
+        self._session.mount("https://", _build_tls_adapter())
 
     def chat(
         self,
