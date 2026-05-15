@@ -936,6 +936,10 @@ def parse_oms_xml(xml_path: str) -> AnalysisResult:
     if extractor is not None:
         try:
             statistics = extractor(xml_path)
+            # Fallback: if dedicated extractor produced empty stats, use generic
+            if not statistics:
+                logger.debug("Dedicated extractor for %s returned empty, using generic", analysis_type)
+                statistics = _extract_statistics(tables)
         except Exception as exc:
             notes.append(
                 f"Dedicated extractor for {analysis_type} failed: {exc}"
@@ -1137,6 +1141,49 @@ def _extract_ttest_independent(text: str) -> list[dict[str, Any]]:
     return rows
 
 
+def _extract_anova_lst(text: str) -> list[dict[str, Any]]:
+    """Extract the ANOVA summary table from ONEWAY / UNIANOVA LST output.
+
+    The ANOVA table contains between-groups and within-groups rows with
+    Sum of Squares, df, Mean Square, F, and Sig.  We extract the
+    between-groups (or first non-error) row for the key statistics.
+
+    Supports both English and Chinese (Simplified) SPSS output.
+    """
+    title_pattern = re.compile(
+        r"(?i)(ANOVA|主体间效应检验)", re.UNICODE
+    )
+    block = _extract_table_block(text, title_pattern)
+    if not block:
+        return []
+
+    rows: list[dict[str, Any]] = []
+    for line in block.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+
+        # SPSS fixed-width columns separated by 2+ spaces
+        parts = re.split(r"\s{2,}", stripped)
+        # ANOVA rows have 6 columns: Source, SS, df, MS, F, Sig
+        # A data row must have at least 5 numeric-looking tokens
+        if len(parts) >= 4:
+            numeric_count = sum(
+                1 for p in parts[1:] if re.match(r"^[\d.,\-eE]+$", p.strip())
+            )
+            if numeric_count >= 3:
+                rows.append({
+                    "Source": parts[0].strip(),
+                    "Sum of Squares": parts[1].strip() if len(parts) > 1 else "",
+                    "df": parts[2].strip() if len(parts) > 2 else "",
+                    "Mean Square": parts[3].strip() if len(parts) > 3 else "",
+                    "F": parts[4].strip() if len(parts) > 4 else "",
+                    "Sig.": parts[5].strip() if len(parts) > 5 else "",
+                })
+
+    return rows
+
+
 # ---------------------------------------------------------------------------
 
 
@@ -1263,10 +1310,38 @@ def parse_raw_lst(lst_text: str, analysis_type: str) -> AnalysisResult:
             logger.warning("Independent Samples Test parse failure: %s", exc)
 
     else:
-        notes.append(
-            f"LST parsing for {analysis_type} is not yet fully implemented. "
-            "Only T-TEST tables are currently extracted via regex."
-        )
+        # ── ANOVA: extract F, p, df from between-groups table ──
+        if analysis_type == "ANOVA":
+            try:
+                anova_rows = _extract_anova_lst(lst_text)
+                if anova_rows:
+                    tables.append(
+                        TableResult(
+                            title="ANOVA",
+                            rows=anova_rows,
+                            source_format="regex_lst",
+                        )
+                    )
+                    for row in anova_rows:
+                        f_val = _safe_float(row.get("F"))
+                        p_val = _safe_float(row.get("Sig."))
+                        df_val = _safe_float(row.get("df"))
+                        if f_val is not None:
+                            statistics["f_value"] = f_val
+                        if p_val is not None:
+                            statistics["p_value"] = p_val
+                        if df_val is not None:
+                            statistics["df"] = int(df_val)
+                        break  # Use first meaningful row (between-groups)
+            except Exception as exc:
+                notes.append(f"Failed to parse ANOVA LST: {exc}")
+                logger.warning("ANOVA LST parse failure: %s", exc)
+
+        if not tables:
+            notes.append(
+                f"LST parsing for {analysis_type} is not yet fully implemented. "
+                "Only T-TEST and ANOVA tables are currently extracted via regex."
+            )
 
     if not tables:
         raise ValueError(

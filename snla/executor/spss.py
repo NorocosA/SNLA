@@ -228,6 +228,13 @@ class SPSSExecutor:
         duration = time.perf_counter() - start_time
         xml_exists = os.path.isfile(xml_path)
 
+        # Capture stdout as fallback LST for edge cases
+        lst_path: str | None = None
+        if stdout.strip():
+            lst_path = os.path.join(run_dir, "output.lst")
+            with open(lst_path, "w", encoding="utf-8", errors="replace") as lf:
+                lf.write(stdout)
+
         success = exit_code == 0 or xml_exists
         error_message = None
         if not success:
@@ -245,7 +252,7 @@ class SPSSExecutor:
             stdout=stdout or "",
             stderr=stderr or "",
             xml_path=xml_path if xml_exists else None,
-            lst_path=None,  # Python mode: OMS XML only, no .lst
+            lst_path=lst_path,
             success=success,
             error_message=error_message,
             duration_seconds=duration,
@@ -511,25 +518,8 @@ class SPSSExecutor:
     ) -> str:
         """Wrap user syntax with OMS commands and prepend a GET FILE preamble.
 
-        The resulting string is ready to be written to a ``.sps`` file:
-
-        .. code-block:: spss
-
-            GET FILE='C:\\data.sav'.
-            DATASET NAME SNLA_Temp.
-            OMS /SELECT TABLES /DESTINATION FORMAT=OXML OUTFILE='C:\\out.xml'.
-            <user_syntax>
-            OMSEND.
-
-        Args:
-            syntax: Raw user syntax.
-            data_path: Path to the ``.sav`` data file.
-            xml_output_path: Desired path for the OMS XML output.
-
-        Returns:
-            Fully wrapped syntax string.
+        Also appends OUTPUT EXPORT to capture listing text for LST fallback.
         """
-        # Normalise path separators: SPSS accepts forward slashes natively
         norm_data: str = os.path.abspath(data_path).replace("\\", "/")
         norm_xml: str = os.path.abspath(xml_output_path).replace("\\", "/")
 
