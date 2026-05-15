@@ -463,7 +463,7 @@ def _call_intent(user_input: str) -> dict[str, Any]:
 
 
 def _call_method(intent: str, user_input: str) -> dict[str, Any]:
-    """Run method recommendation (or mock)."""
+    """Run method recommendation (or mock).  Falls back to intent hint on LLM failure."""
     sess: SessionState = st.session_state.session
     # Read suggested_method hint set by _mock_intent
     hinted = getattr(sess, "_intent_suggested_method", None)
@@ -478,7 +478,13 @@ def _call_method(intent: str, user_input: str) -> dict[str, Any]:
         intent=intent, variables=_get_cloud_vars(),
         conversation_context=user_input,
     )
-    return json.loads(client.chat(messages)["content"])
+    try:
+        return json.loads(client.chat(messages)["content"])
+    except (json.JSONDecodeError, KeyError, ValueError):
+        if hinted:
+            return {"recommended_method": hinted, "grouping_variable": None,
+                    "test_variable": None, "alternatives": [], "rationale": "fallback"}
+        return _mock_method(intent)
 
 
 def _call_syntax(method: str) -> str:

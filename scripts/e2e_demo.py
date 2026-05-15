@@ -213,10 +213,22 @@ def recommend_method(intent_data: dict, variables: list[dict], user_input: str,
         client = LLMClient()
         messages = build_method_prompt(intent=intent, variables=variables,
                                        conversation_context=user_input)
-        result = _safe_json_parse(client.chat(messages)["content"])
-        method = result.get("recommended_method", "descriptives")
-        cat_var = result.get("grouping_variable")
-        num_var = result.get("test_variable")
+        try:
+            result = _safe_json_parse(client.chat(messages)["content"])
+            method = result.get("recommended_method", "descriptives")
+            cat_var = result.get("grouping_variable")
+            num_var = result.get("test_variable")
+        except (ValueError, KeyError):
+            # LLM returned unparseable JSON — fall back to intent hint
+            suggested = intent_data.get("suggested_method")
+            if suggested:
+                method = suggested
+                cat_var, num_var = _auto_detect_vars(variables, intent)
+                print(f"      LLM 方法推荐失败，回退到建议方法: {method}")
+            else:
+                cat_var, num_var = _auto_detect_vars(variables, intent)
+                method = _mock_method(intent, cat_var, num_var)
+                print(f"      LLM 方法推荐失败，回退到 MOCK: {method}")
 
     # Rule-engine double-check
     from snla.syntax.templates import validate_method
