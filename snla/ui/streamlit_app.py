@@ -13,6 +13,7 @@ import json
 import os
 import sys
 import tempfile
+import time
 from typing import Any
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
@@ -148,10 +149,16 @@ def render_input() -> None:
         user_input = st.chat_input(
             "输入分析需求...", disabled=(stage in ("THINKING", "EXECUTING")))
     with col2:
-        if stage in ("THINKING", "EXECUTING"):
-            if st.button("⏹ 停止", type="secondary", use_container_width=True):
+        if stage == "THINKING":
+            st.caption("🧠 LLM 思考中…")
+            if st.button("⏹ 停止", type="secondary", use_container_width=True, key="stop_think"):
                 sess.cancel()
-                st.toast("正在停止当前操作...", icon="⏹")
+                st.toast("正在停止…", icon="⏹")
+        elif stage == "EXECUTING":
+            st.caption("⚙️ SPSS 执行中…")
+            if st.button("⏹ 停止", type="primary", use_container_width=True, key="stop_exec"):
+                sess.cancel()
+                st.toast("正在终止 SPSS…", icon="⏹")
 
     if user_input:
         handle_user_message(user_input)
@@ -173,9 +180,11 @@ def handle_user_message(user_input: str) -> None:
 def process_analysis(user_input: str) -> None:
     """Run the full SNLA analysis pipeline: intent→method→syntax→execute→parse→explain."""
     sess: SessionState = st.session_state.session
+    t_start = time.perf_counter()
     try:
         # Step 1: Intent recognition
-        with st.spinner("🤔 正在理解你的分析需求..."):
+        t_stage = time.perf_counter()
+        with st.spinner(f"🤔 正在理解你的分析需求..."):
             intent_data = _call_intent(user_input)
         intent = intent_data.get("intent", "unknown")
         if intent == "unknown":
@@ -297,10 +306,13 @@ def process_analysis(user_input: str) -> None:
             if template_syntax:
                 val_result = validate_syntax(template_syntax, sess.get_variable_names())
                 if val_result["valid"]:
+                    # ── F1: Degradation comparison card ──
+                    _render_degradation_card(
+                        original_syntax=syntax,
+                        fallback_syntax=template_syntax,
+                        method=recommended_method,
+                    )
                     syntax = template_syntax
-                    with st.expander("📝 查看模板语法（可能无法完全匹配原始意图）", expanded=True):
-                        st.caption("具体差异：已从 LLM 生成语法切换为标准模板")
-                        st.code(syntax, language="text")
                     with st.spinner("⚙️ 正在执行模板语法..."):
                         exec_result = _execute_syntax(syntax, False)
 
@@ -337,12 +349,14 @@ def process_analysis(user_input: str) -> None:
             explanation = explain_result(analysis_result, use_llm_polish=False)
 
         # Display results
+        elapsed_total = time.perf_counter() - t_start
         st.markdown("### 📈 分析结果")
         st.markdown(explanation)
         if analysis_result.statistics:
             with st.expander("📊 关键统计量", expanded=False):
                 for key, value in analysis_result.statistics.items():
                     st.metric(label=key.replace("_", " ").title(), value=value)
+        st.caption(f"⏱ 总耗时 {elapsed_total:.1f}s")
 
         # Record in session
         sess.add_message("assistant", explanation)
@@ -614,7 +628,51 @@ def _llm_fix_syntax(failed_syntax: str, error_text: str, sess: SessionState) -> 
         return None
 
 
-def _method_label(method: str) -> str:
+def _render_degradation_card(
+    original_syntax: str, fallback_syntax: str, method: str
+) -> None:
+    """Render a comparison card when the system falls back to template syntax.
+
+    Shows the user what changed between the LLM-generated syntax and the
+    template fallback, using a side-by-side layout.  Designed for users
+    with no statistical background (Plan.md §3.9 UX specification).
+    """
+    original_lines = original_syntax.strip().split("\n")
+    fallback_lines = fallback_syntax.strip().split("\n")
+
+    # Extract the core command for each (first non-blank line)
+    original_cmd = next((l.strip() for l in original_lines if l.strip()), original_syntax[:60])
+    fallback_cmd = next((l.strip() for l in fallback_lines if l.strip()), fallback_syntax[:60])
+
+    with st.container(border=True):
+        st.markdown("#### ⚠️ 语法自动修正已用尽，已切换至标准模板")
+        st.caption(
+            f"您原本要执行的分析：**{_method_label(method)}**\n\n"
+            "因语法生成/执行失败，已自动切换为预置标准模板。"
+        )
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.markdown("**❌ 原始语法（失败）**")
+            st.code(original_cmd, language="text")
+        with col2:
+            st.markdown("**✅ 模板语法（兜底）**")
+            st.code(fallback_cmd, language="text")
+
+        # Show full syntax in expanders
+        with st.expander("🔍 查看完整语法对比", expanded=False):
+            c1, c2 = st.columns(2)
+            with c1:
+                st.caption("原始语法")
+                st.code(original_syntax, language="text")
+            with c2:
+                st.caption("模板语法")
+                st.code(fallback_syntax, language="text")
+
+        st.caption(
+            "⚠️ 模板语法为标准化版本，可能无法完全匹配您的原始分析意图。"
+            "结果仅供参考，建议检查后重新描述需求。"
+        )
     """Convert method code to Chinese label."""
     labels = {
         "independent_t_test": "独立样本t检验",
