@@ -182,12 +182,41 @@ def process_analysis(user_input: str) -> None:
             _fail("❌ 抱歉，我没能理解你的分析需求。请换一种方式描述试试？")
             return
 
-        # Step 2: Method recommendation
-        with st.spinner("🔬 正在推荐统计方法..."):
-            method_data = _call_method(intent, user_input)
-        recommended_method = method_data.get("recommended_method", "descriptives")
-        grouping_var = method_data.get("grouping_variable")
-        test_var = method_data.get("test_variable")
+        # Step 1b: Handle follow_up — reuse previous context, skip method recommendation
+        if intent == "follow_up":
+            if sess.last_analysis is None:
+                _fail("抱歉，没有上一轮分析上下文...")
+                return
+            recommended_method = sess.last_analysis["method"]
+            modified_variable = intent_data.get("modified_variable")
+            grouping_var = sess.last_analysis.get("grouping_var")
+            test_var = sess.last_analysis.get("test_var")
+            if modified_variable:
+                # Auto-detect: modified var with value_labels → grouping_var, else → test_var
+                is_grouping = any(
+                    v["name"] == modified_variable and v.get("value_labels")
+                    for v in sess.variables
+                )
+                if is_grouping:
+                    grouping_var = modified_variable
+                else:
+                    test_var = modified_variable
+            if modified_variable:
+                st.info(
+                    f"🔁 基于上一轮分析上下文，将 **{modified_variable}** "
+                    f"代入 **{_method_label(recommended_method)}**"
+                )
+            else:
+                st.info(
+                    f"🔁 基于上一轮分析上下文，继续使用 **{_method_label(recommended_method)}**"
+                )
+        else:
+            # Step 2: Method recommendation
+            with st.spinner("🔬 正在推荐统计方法..."):
+                method_data = _call_method(intent, user_input)
+            recommended_method = method_data.get("recommended_method", "descriptives")
+            grouping_var = method_data.get("grouping_variable")
+            test_var = method_data.get("test_variable")
 
         # Step 3: Validate method with rules engine
         from snla.syntax.templates import validate_method
@@ -440,9 +469,39 @@ class _MockExecResult:
     error_message = None
 
 
+def _method_label(method: str) -> str:
+    """Convert method code to Chinese label."""
+    labels = {
+        "independent_t_test": "独立样本t检验",
+        "paired_t_test": "配对样本t检验",
+        "oneway_anova": "单因素方差分析",
+        "pearson_correlation": "Pearson相关分析",
+        "spearman_correlation": "Spearman相关分析",
+        "simple_regression": "简单线性回归",
+        "chi_square": "卡方检验",
+        "descriptives": "描述统计",
+        "frequencies": "频率分析",
+    }
+    return labels.get(method, method)
+
+
 def _mock_intent(user_input: str) -> dict[str, Any]:
     """Keyword-based intent classification for mock mode."""
     lower = user_input.lower()
+    # Follow-up detection — must come before other keyword checks
+    sess = st.session_state.session
+    if sess.last_analysis is not None:
+        follow_markers = ("换成", "再看看", "改为", "改成", "换一下", "那...呢", "呢")
+        has_follow = any(w in lower for w in follow_markers)
+        if has_follow:
+            modified_var = None
+            for v in sess.variables:
+                if v["name"].lower() in lower or ((v.get("label") or "").lower() in lower if v.get("label") else False):
+                    modified_var = v["name"]
+                    break
+            if modified_var:
+                return {"intent": "follow_up", "confidence": 0.85, "rationale": "MOCK follow_up",
+                        "modified_variable": modified_var, "suggested_method": None}
     if any(w in lower for w in ("比较", "差异", "compare", "diff", "男生", "女生", "男女")):
         return {"intent": "compare_groups", "confidence": 0.9, "rationale": "MOCK",
                 "modified_variable": None, "suggested_method": "independent_t_test"}
@@ -458,6 +517,18 @@ def _mock_intent(user_input: str) -> dict[str, Any]:
 
 def _mock_method(intent: str) -> dict[str, Any]:
     """Return a reasonable mock method recommendation."""
+    if intent == "follow_up":
+        sess = st.session_state.session
+        if sess.last_analysis:
+            return {
+                "recommended_method": sess.last_analysis["method"],
+                "grouping_variable": sess.last_analysis.get("grouping_var"),
+                "test_variable": sess.last_analysis.get("test_var"),
+                "alternatives": [], "assumptions_check": [],
+                "rationale": "MOCK follow_up", "confidence": 0.85,
+            }
+        return {"recommended_method": "descriptives", "grouping_variable": None, "test_variable": None,
+                "alternatives": [], "assumptions_check": [], "rationale": "MOCK fallback", "confidence": 0.5}
     sess: SessionState = st.session_state.session
     cat_var = num_var = None
     for v in sess.variables:
