@@ -249,8 +249,12 @@ class Retriever:
         }
 
         command = method_to_command.get(method)
-        if not command:
-            docs = self.search(method, n_results=n_chunks)
+        if command is None:
+            # Method may already be an SPSS command name (e.g., 'T-TEST')
+            command = method
+            docs = self.get_command(command)
+            if not docs:
+                docs = self.search(method, n_results=n_chunks)
         else:
             docs = self.get_command(command)
             if not docs:

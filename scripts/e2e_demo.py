@@ -43,10 +43,17 @@ from snla.config import DEBUG, LLM_MOCK, SPSS_EXEC_MODE
 
 
 def _safe_json_parse(text: str) -> dict:
-    """Parse LLM output that may contain markdown fences or malformed JSON."""
+    """Parse LLM output that may contain markdown fences or malformed JSON.
+
+    Returns a fallback dict on empty / unparseable input rather than raising,
+    so the pipeline can gracefully degrade.
+    """
     import json as _json
 
     text = text.strip()
+    if not text:
+        return {"recommended_method": "descriptives"}
+
     try:
         return _json.loads(text)
     except _json.JSONDecodeError:
@@ -70,7 +77,9 @@ def _safe_json_parse(text: str) -> dict:
         except _json.JSONDecodeError:
             pass
 
-    raise ValueError(f"Failed to parse JSON from LLM output: {text[:200]}")
+    # Graceful degradation: return a fallback method recommendation
+    print(f"      ⚠️ JSON parse failed, using fallback: {text[:80]}...")
+    return {"recommended_method": "descriptives"}
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -133,9 +142,13 @@ def recognize_intent(user_input: str, variables: list[dict]) -> dict:
     else:
         from snla.llm.client import LLMClient
         from snla.llm.prompts.intent import build_intent_prompt
-        client = LLMClient()
-        messages = build_intent_prompt(user_message=user_input, variables=variables)
-        result = _safe_json_parse(client.chat(messages)["content"])
+        try:
+            client = LLMClient()
+            messages = build_intent_prompt(user_message=user_input, variables=variables)
+            result = _safe_json_parse(client.chat(messages)["content"])
+        except Exception as e:
+            print(f"      LLM 意图识别失败 ({e}), 使用关键词兜底")
+            result = _mock_intent(user_input)
 
     intent = result.get("intent", "unknown")
     confidence = result.get("confidence", 0)
@@ -210,13 +223,21 @@ def recommend_method(intent_data: dict, variables: list[dict], user_input: str,
     else:
         from snla.llm.client import LLMClient
         from snla.llm.prompts.method import build_method_prompt
-        client = LLMClient()
-        messages = build_method_prompt(intent=intent, variables=variables,
-                                       conversation_context=user_input)
-        result = _safe_json_parse(client.chat(messages)["content"])
-        method = result.get("recommended_method", "descriptives")
-        cat_var = result.get("grouping_variable")
-        num_var = result.get("test_variable")
+        cat_var = num_var = None
+        method = "descriptives"
+        try:
+            client = LLMClient()
+            messages = build_method_prompt(intent=intent, variables=variables,
+                                           conversation_context=user_input)
+            result = _safe_json_parse(client.chat(messages)["content"])
+            method = result.get("recommended_method", "descriptives")
+            cat_var = result.get("grouping_variable")
+            num_var = result.get("test_variable")
+        except Exception as e:
+            print(f"      LLM 方法推荐失败 ({e}), 使用规则推断兜底")
+            cat_var, num_var = _auto_detect_vars(variables, intent)
+            suggested = intent_data.get("suggested_method")
+            method = _mock_method(intent, cat_var, num_var, suggested)
 
     # Rule-engine double-check
     from snla.syntax.templates import validate_method
