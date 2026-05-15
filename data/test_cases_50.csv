@@ -1,0 +1,51 @@
+编号,分类,NL描述,预期统计方法,预期分组变量,预期检验变量,特殊场景,验收状态,验收人,备注
+D01,基础描述统计,"计算所有同学成绩的平均分和标准差",DESCRIPTIVES,无,score,单变量描述,未验收,,P0 verified
+D02,基础描述统计,"统计一下男生和女生各有多少人",FREQUENCIES,gender,无,分类变量频数,未验收,, 
+D03,基础描述统计,"各班级的人数分布是怎样的",FREQUENCIES,class,无,字符串变量频数,未验收,, 
+D04,基础描述统计,"成绩的最高分、最低分和平均分是多少",DESCRIPTIVES,无,score,极值+均值,未验收,,
+D05,基础描述统计,"看看年龄的分布情况，分5个年龄段",FREQUENCIES,age,无,连续变量分组,未验收,,需预处理 RECODE
+D06,基础描述统计,"计算各班级成绩的平均分、标准差、最大值、最小值",MEANS,class,score,分组描述统计,未验收,,
+D07,基础描述统计,"成绩数据有没有缺失值",FREQUENCIES,无,score,缺失值检测,未验收,, 
+D08,基础描述统计,"年龄的中位数和四分位数是多少",FREQUENCIES,无,age,中位数/四分位,未验收,,需 STATISTICS=MEDIAN
+D09,基础描述统计,"成绩的偏度和峰度是多少",FREQUENCIES,无,score,分布形态,未验收,,需 STATISTICS=SKEWNESS KURTOSIS
+D10,基础描述统计,"列出成绩在前10名的同学信息",SORT CASES,无,score,排序需求,未验收,,灰名单 SORT CASES
+G01,组间比较,"比较男女生在成绩上是否有显著差异",INDEPENDENT T-TEST,gender,score,独立样本t检验,未验收,,P0 verified
+G02,组间比较,"不同班级的成绩有没有差异",ONEWAY ANOVA,class,score,单因素方差分析,未验收,,
+G03,组间比较,"实验组和对照组在焦虑量表得分上是否有差异",INDEPENDENT T-TEST,group,anxiety,独立样本t检验,未验收,, 
+G04,组间比较,"培训前后员工的绩效分数是否有变化",PAIRED T-TEST,无,pre_score+post_score,配对样本t检验,未验收,, 
+G05,组间比较,"不同年级的数学成绩有没有差异",ONEWAY ANOVA,grade,math_score,单因素ANOVA（多组）,未验收,,
+G06,组间比较,"男女生的收入有没有差别（数据不服从正态分布）",MANN-WHITNEY U,gender,income,非参数检验,未验收,,需假设违背检测
+G07,组间比较,"三种教学方法的教学效果有没有差异",KRUSKAL-WALLIS,method,effect_score,非参数ANOVA,未验收,,
+G08,组间比较,"男生和女生在成绩上，考虑年龄的影响后还有差异吗",ANCOVA,gender,score,协方差分析,未验收,,需 covariate=age
+G09,组间比较,"城市、乡镇、农村三组学生的科学素养是否有差异",ONEWAY ANOVA,region,science_score,三组ANOVA,未验收,, 
+G10,组间比较,"第一次考试和第二次考试的成绩有没有变化",PAIRED T-TEST,无,exam1+exam2,配对t检验,未验收,,
+G11,组间比较,"不同学历水平的收入是否有差异（学历分为高中、本科、硕士、博士四级）",ONEWAY ANOVA,education,income,多组ANOVA,未验收,,
+G12,组间比较,"男女在幸福感量表各维度上的差异",MANOVA,gender,happy_dim1+happy_dim2+happy_dim3,多变量方差分析,未验收,, 
+G13,组间比较,"只看女生的数据，不同班级的成绩有没有差异",ONEWAY ANOVA,class,score,条件筛选+ANOVA,未验收,,需预处理 SELECT IF
+G14,组间比较,"药物治疗组和安慰剂组在症状改善上是否有差异（数据偏态）",MANN-WHITNEY U,group,symptom_change,非参数检验（偏态）,未验收,,
+G15,组间比较,"不同年龄段（青年/中年/老年）的血压值有没有差异",ONEWAY ANOVA,age_group,blood_pressure,分组后ANOVA,未验收,,需预处理 RECODE
+R01,相关与回归,"研究年龄和成绩之间的关系",PEARSON CORRELATION,无,age+score,简单相关,未验收,,P0 verified
+R02,相关与回归,"学习时间和考试成绩之间有没有关系",PEARSON CORRELATION,无,study_hours+exam_score,简单相关,未验收,,
+R03,相关与回归,"收入、受教育年限和工作经验哪个对职业满意度影响更大",MULTIPLE REGRESSION,无,career_satisfaction,多元回归,未验收,,
+R04,相关与回归,"学生的出勤率能不能预测期末成绩",SIMPLE REGRESSION,无,final_score,简单回归,未验收,,predictor=attendance
+R05,相关与回归,"等级评定数据（如满意度1-5级）和学习成绩的关系",SPEARMAN CORRELATION,无,satisfaction_rank+score,秩相关,未验收,,
+R06,相关与回归,"焦虑水平和考试成绩之间是负相关吗",PEARSON CORRELATION,无,anxiety+exam_score,负相关预期,未验收,,
+R07,相关与回归,"身高和体重的关系，分男女看",PEARSON CORRELATION,gender,height+weight,分组相关,未验收,,需预处理 SPLIT FILE
+R08,相关与回归,"年龄、收入和消费支出三者之间的关系",MULTIPLE REGRESSION,无,spending,多元回归,未验收,,
+R09,相关与回归,"能不能用中考成绩预测高考成绩",SIMPLE REGRESSION,无,gaokao_score,简单回归,未验收,,predictor=zhongkao_score
+R10,相关与回归,"每周运动时间和BMI指数的关系（数据不服从正态）",SPEARMAN CORRELATION,无,exercise_hours+bmi,非参数相关,未验收,,
+C01,交叉表与卡方,"性别和是否通过考试之间有关系吗",CROSSTABS+CHI-SQUARE,gender,pass,2x2交叉表,未验收,,
+C02,交叉表与卡方,"不同学历和是否就业之间有没有关系",CROSSTABS+CHI-SQUARE,education,employed,多行×2列,未验收,,
+C03,交叉表与卡方,"专业选择和性别有关系吗",CROSSTABS+CHI-SQUARE,gender,major,2×多列,未验收,,
+C04,交叉表与卡方,"三种治疗方案和康复情况之间是否独立",CROSSTABS+CHI-SQUARE,treatment,recovery,3×3表格,未验收,,
+C05,交叉表与卡方,"吸烟习惯和肺癌发病率的关系",CROSSTABS+CHI-SQUARE,smoking,lung_cancer,流行病学经典案例,未验收,,
+V01,图表生成,"画一个按性别分组的成绩箱线图",EXAMINE (boxplot),gender,score,箱线图,未验收,,
+V02,图表生成,"画出年龄和成绩的散点图",GRAPH (scatter),无,age+score,散点图,未验收,,
+V03,图表生成,"画出成绩分布的直方图",GRAPH (histogram),无,score,直方图,未验收,,
+V04,图表生成,"不同班级成绩的分组条形图（含误差线）",GRAPH (bar chart),class,score,分组条形图,未验收,,
+V05,图表生成,"各班级成绩的Q-Q图（检验正态性）",EXAMINE (Q-Q plot),class,score,Q-Q图,未验收,,
+Z01,中文口语化表达,"算一下男女在语文分数上有没得差别",INDEPENDENT T-TEST,gender,chinese_score,方言口语,未验收,,
+Z02,中文口语化表达,"帮我瞅瞅年纪大的是不是工资也高",PEARSON CORRELATION,无,age+salary,北方口语,未验收,,
+Z03,中文口语化表达,"这几个班的成绩差得多不多啊",ONEWAY ANOVA,class,score,模糊比较意图,未验收,,
+Z04,中文口语化表达,"我就想知道到底是男的考得好还是女的考得好",INDEPENDENT T-TEST,gender,score,口语化比较,未验收,,
+Z05,中文口语化表达,"你说学习时间长了到底有没有用啊，成绩会变好吗",PEARSON CORRELATION,无,study_time+score,口语化追问,未验收,,
