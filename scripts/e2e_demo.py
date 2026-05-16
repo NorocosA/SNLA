@@ -70,6 +70,23 @@ def _safe_json_parse(text: str) -> dict:
         except _json.JSONDecodeError:
             pass
 
+    # Try to repair truncated JSON (LLM output cut off mid-response)
+    if start >= 0 and (end < 0 or end <= start):
+        fragment = text[start:]
+        # Count open braces/brackets and close them
+        open_braces = fragment.count("{") - fragment.count("}")
+        open_brackets = fragment.count("[") - fragment.count("]")
+        # Count if we're inside a string (odd number of unescaped quotes)
+        in_string = fragment.count('"') % 2 == 1
+        if in_string:
+            fragment += '"'
+        fragment += "}" * max(open_braces, 0)
+        fragment += "]" * max(open_brackets, 0)
+        try:
+            return _json.loads(fragment)
+        except _json.JSONDecodeError:
+            pass
+
     raise ValueError(f"Failed to parse JSON from LLM output: {text[:200]}")
 
 

@@ -253,6 +253,12 @@ TEMPLATE_MAP: Dict[str, Callable[..., str]] = {
     "descriptives": descriptives,
     "correlations": correlations,
     "pearson_correlation": correlations,
+    # Graph aliases — fall back to closest statistical equivalent
+    "bar_chart": anova_oneway,
+    "histogram": frequencies,
+    "scatter": correlations,
+    "boxplot": ttest_independent,
+    "qq_plot": descriptives,
 }
 """Map of statistical method keys to their corresponding template functions.
 
