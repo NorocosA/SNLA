@@ -54,15 +54,17 @@
 
 ## 三、技术方案
 ### 3.1 整体架构
-前端：**MVP 锁定 Streamlit**（快速原型 + 社区生态）；P3 阶段评估 PyWebView/Electron 桌面替代方案  
-后端：Python核心引擎  
+前端：**PyWebView 桌面窗口**（Windows 原生 Edge WebView2），fallback 浏览器；替代已弃用的 Streamlit  
+后端：Python 核心引擎 + Flask 内嵌 API 服务器  
 大模型：支持在线API（GPT/Claude/DeepSeek）和本地离线模型（如Llama 3, Qwen等），适应数据隐私需求
 
-> **前端决策矩阵**：Streamlit 是唯一 P0-P2 前端。桌面化方案（PyWebView / Electron）仅在 P3 "交互优化"阶段重新评估，且需满足：a) 离线场景必需 b) 用户强烈需要 .exe 安装包
+> **前端决策**：P0 阶段使用 Streamlit 快速原型，P4 阶段因 Streamlit 与 PyInstaller 打包兼容性问题（静态文件丢失、无官方 hook），切换为 Flask + PyWebView 桌面方案。无 pywebview 时自动回退浏览器模式。
 
-用户界面 (聊天窗)
+桌面窗口 (PyWebView / 浏览器 fallback)
+↕ (HTTP REST API)
+Flask API 服务器 (snla/ui/server.py)
 ↕
-对话管理 & 变量信息存储
+对话管理 & 变量信息存储 (session.py)
 ↕
 LLM调用模块 (意图识别 → 统计方法推荐 → 语法生成)
 ↕
@@ -117,7 +119,8 @@ snla/
 ├── explainer/
 │   └── naturalize.py          # 统计结果 → 自然语言解读
 ├── ui/
-│   └── streamlit_app.py       # Streamlit MVP 前端
+│   ├── server.py              # Flask REST API 服务器
+│   └── index.html              # 前端页面 (HTML/CSS/JS)
 ├── tests/
 │   ├── conftest.py              # pytest fixtures: mock LLM, mock SPSS output
 │   ├── test_validator.py        # 安全沙箱 + 变量校验
@@ -794,7 +797,14 @@ python -m pytest tests/test_integration.py::test_llm_syntax -v
 python -m pytest tests/test_sanitizer.py -v
 ```
 
-### 启动 MVP
+### 启动
 ```powershell
-streamlit run ui/streamlit_app.py
+# 桌面模式 (需要 pywebview)
+python launcher.py
+
+# 或命令行 Demo
+python scripts/e2e_demo.py --data-file data/fixtures/test_data.sav
+
+# Flask API 独立运行
+python snla/ui/server.py
 ```

@@ -14,7 +14,7 @@ pip install -r requirements.txt
 copy .env.example .env
 
 # 3. 启动
-streamlit run snla/ui/streamlit_app.py
+python launcher.py
 
 # 或者命令行 Demo
 python scripts/e2e_demo.py --data-file data/fixtures/test_data.sav
@@ -32,6 +32,7 @@ python scripts/e2e_demo.py --data-file data/fixtures/test_data.sav
 | 📥 Word 导出 | APA 格式报告一键下载 |
 | 🔒 隐私保护 | 只发变量名/类型/标签给云端 LLM，原始数据不过网 |
 | 🛡 安全沙箱 | 黑名单拦截危险操作（SAVE/DELETE/HOST COMMAND） |
+| 🖥 桌面应用 | PyWebView 原生窗口（fallback 浏览器），`SNLA.exe` 单文件分发 |
 
 ## 支持的分析
 
@@ -56,12 +57,25 @@ snla/
 ├── parser/            # OMS XML + LST 输出解析
 ├── explainer/         # 统计约束层 + 白话解读 + Word 导出
 ├── rag/               # RAG 知识库（可选）
-├── ui/                # Streamlit 前端
+├── ui/                # Flask API + 前端页面
 └── tests/             # 56 单元/集成测试
 
 scripts/               # E2E Demo / 批量验证 / 崩溃恢复
 docs/                  # 用户指南
 data/                  # 测试数据集（4/11 变量版本）
+launcher.py            # 桌面启动器（PyWebView / 浏览器）
+snla.spec              # PyInstaller 打包配置
+```
+
+## 打包
+
+```powershell
+# 安装 pywebview（可选，需要 .NET SDK）
+pip install pywebview
+
+# 打包为单文件 .exe
+pyinstaller snla.spec --noconfirm
+# 输出: dist/SNLA.exe
 ```
 
 ## 许可
