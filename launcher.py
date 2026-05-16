@@ -1,9 +1,10 @@
 """SNLA Standalone Launcher — double-click to run.
-
+ 
 Starts the Streamlit server and opens the default browser.
 No command-line required.
 """
 import os
+import socket
 import subprocess
 import sys
 import threading
@@ -11,48 +12,41 @@ import time
 import webbrowser
 
 
-def find_streamlit() -> str:
-    """Find the streamlit executable in the current environment."""
-    # Check alongside this exe (PyInstaller bundle)
-    base = os.path.dirname(sys.executable if getattr(sys, "frozen", False) else __file__)
-    candidates = [
-        os.path.join(base, "streamlit.exe"),
-        os.path.join(base, "Scripts", "streamlit.exe"),
-        os.path.join(sys.prefix, "Scripts", "streamlit.exe"),
-    ]
-    for c in candidates:
-        if os.path.exists(c):
-            return c
-    # Fallback to PATH
-    return "streamlit"
+def _wait_for_port(port: int, timeout: int = 60) -> bool:
+    """Block until localhost:port is accepting connections, or timeout."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            s = socket.create_connection(("localhost", port), timeout=1)
+            s.close()
+            return True
+        except (ConnectionRefusedError, socket.timeout, OSError):
+            time.sleep(0.5)
+    return False
 
 
 def main():
-    app_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "snla", "ui", "streamlit_app.py",
-    )
+    # When bundled by PyInstaller, sys._MEIPASS contains extracted files
+    base = sys._MEIPASS if getattr(sys, "frozen", False) else os.path.dirname(os.path.abspath(__file__))
+    app_path = os.path.join(base, "snla", "ui", "streamlit_app.py")
 
     if not os.path.exists(app_path):
         print(f"ERROR: Streamlit app not found at {app_path}")
-        print("Make sure this launcher is in the project root directory.")
         input("Press Enter to exit...")
         sys.exit(1)
-
-    streamlit_exe = find_streamlit()
 
     print("=" * 50)
     print("  SPSS Natural Language Assistant")
     print("=" * 50)
     print()
-    print(f"  Starting server...")
-    print(f"  App: {app_path}")
-    print()
 
-    # Start streamlit in a subprocess
+    port = 8501
+
+    # Use streamlit CLI module directly (works both dev and PyInstaller)
     proc = subprocess.Popen(
-        [streamlit_exe, "run", app_path,
+        [sys.executable, "-m", "streamlit", "run", app_path,
          "--server.headless", "true",
+         "--server.port", str(port),
          "--browser.serverAddress", "localhost"],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -61,28 +55,32 @@ def main():
         errors="replace",
     )
 
-    # Wait for server to be ready, then open browser
-    url = "http://localhost:8501"
-
+    # Port-check thread (decoupled from stdout consumption)
     def _wait_and_open():
-        for line in proc.stdout:
-            if "You can now view" in line or "Network URL" in line:
-                webbrowser.open(url)
-                break
+        print(f"  Waiting for server on port {port} ...")
+        if _wait_for_port(port):
+            print(f"  Server ready. Opening http://localhost:{port} ...")
+            webbrowser.open(f"http://localhost:{port}")
+        else:
+            print(f"  WARNING: Server did not respond within 60 seconds.")
+            print(f"  Please open http://localhost:{port} manually in your browser.")
 
     threading.Thread(target=_wait_and_open, daemon=True).start()
 
-    print(f"  Opening browser to {url} ...")
-    print()
-    print("  Press Ctrl+C to stop the server.")
+    print(f"  Press Ctrl+C or close this window to stop.")
     print("=" * 50)
 
+    # Main thread: stream Streamlit's stdout to console
     try:
-        proc.wait()
+        for line in proc.stdout:
+            print(line, end="")
     except KeyboardInterrupt:
         print("\nShutting down...")
         proc.terminate()
-        proc.wait(timeout=5)
+    finally:
+        proc.wait()
+
+    print("Server stopped.")
 
 
 if __name__ == "__main__":
