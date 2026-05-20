@@ -711,22 +711,33 @@ def _syntax_template(method: str, grouping_var: str | None = None,
         if not any(v["name"] == test_var for v in vars_list):
             num_var = None
 
+    # Skip metadata/ID variables in auto-detection
+    _skip_vars = {"id", "ID", "Id", "customerid", "customer_id",
+                  "row", "ROW", "case", "CASE"}
+    _ok_var = lambda v: v.get("type") == "Numeric" and v["name"] not in _skip_vars
+
     # Fall back to auto-detection if Phase 1 didn't provide
     if not cat_var or not num_var:
         for v in vars_list:
             if v.get("value_labels") and not cat_var:
                 cat_var = v["name"]
-            elif v.get("type") == "Numeric" and not num_var:
+            elif _ok_var(v) and not num_var:
                 num_var = v["name"]
-            elif v.get("type") == "Numeric" and not num_var2 and v["name"] != num_var:
+            elif _ok_var(v) and not num_var2 and v["name"] != num_var:
                 num_var2 = v["name"]
 
+    # Default fallback — skip id columns
+    _def_num = next((v["name"] for v in vars_list
+                     if v.get("type") == "Numeric" and v["name"] not in _skip_vars), "score")
     cat = cat_var or (vars_list[0]["name"] if vars_list else "group")
-    num = num_var or (vars_list[1]["name"] if len(vars_list) > 1 else "score")
+    num = num_var or _def_num
 
     def _corr_args():
-        """Find two numeric variables for correlation."""
-        nv = [v["name"] for v in vars_list if v.get("type") == "Numeric" and not v.get("value_labels")]
+        """Find two numeric variables for correlation (skip id columns)."""
+        _skip = {"id", "ID", "Id"}
+        nv = [v["name"] for v in vars_list
+              if v.get("type") == "Numeric" and not v.get("value_labels")
+              and v["name"] not in _skip]
         if len(nv) >= 2:
             return {"var1": nv[0], "var2": nv[1]}
         return {"var1": num, "var2": num}

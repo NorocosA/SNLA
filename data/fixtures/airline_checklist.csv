@@ -1,0 +1,16 @@
+编号,NL描述,预期统计方法,预期分组变量,预期检验变量,数据集,备注
+A1,比较不同性别的满意度是否有差异,independent_t_test,Gender,satisfaction,airline
+A2,不同仓位等级的满意度是否存在显著差异,oneway_anova,Class,satisfaction,airline
+A3,年龄和飞行距离之间存在什么关系,pearson_correlation,,Age/FlightDistance,airline
+A4,忠诚客户和非忠诚客户的满意度有没有差别,independent_t_test,CustomerType,satisfaction,airline
+A5,商务旅行和个人旅行的乘客在满意度上有差异吗,independent_t_test,TypeofTravel,satisfaction,airline
+A6,不同仓位等级的清洁度评分是否有显著差异,oneway_anova,Class,Cleanliness,airline
+A7,飞行距离能否预测乘客满意度,simple_regression,,FlightDistance/satisfaction,airline
+A8,分析各服务维度(食物/座位/娱乐/值机)与满意度的相关性,pearson_correlation,,satisfaction+scores,airline
+A9,不同仓位等级的等候延误时间是否有显著差异,oneway_anova,Class,DepartureDelayinMinutes,airline
+A10,统计各仓位等级的乘客人数分布,frequencies,,Class,airline
+A11,比较不同旅行类型乘客的年龄差异,independent_t_test,TypeofTravel,Age,airline
+A12,在线预定便捷度和满意度之间的关系如何,pearson_correlation,,EaseofOnlinebooking/satisfaction,airline
+A13,忠诚客户中不同性别的满意度有差异吗,independent_t_test,Gender,satisfaction,airline
+A14,分析行李服务、登机服务和清洁度对满意度的影响,simple_regression,,satisfaction+scores,airline
+A15,不同仓位等级在各项服务评分上有哪些显著差异,oneway_anova,Class,various,airline
