@@ -113,8 +113,8 @@ docs/                # user_guide.md
 ## Current status
 
 - [x] P0–P3 complete
-- [x] P4: Frontend migrated Streamlit → Flask + PyWebView (committed)
-- [ ] P4: PyInstaller packaging (`pyinstaller snla.spec --noconfirm`)
+- [x] P4: Frontend migrated Streamlit → Flask + PyWebView
+- [x] P4: Server rewrite — greylist flow, cancellation, settings persistence, template-based syntax
+- [x] P4: PyInstaller packaging → `dist/SNLA.exe` (77.5 MB)
+- [x] P4: E2E verification — 3/3 real SPSS pipelines pass (T-Test, Descriptives, Correlations)
 - [ ] P4: 50-case test checklist verification
-
-Uncommitted work: `server.py` (+818/-165 lines) and `index.html` (+343 lines) contain post-migration enhancements.
