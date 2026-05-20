@@ -403,7 +403,7 @@ def _determine_analysis_type(text: str) -> str:
     lower = text.lower()
     if "t-test" in lower or "t test" in lower or "独立样本" in lower:
         return "T-TEST"
-    if "anova" in lower or "unianova" in lower or "主体间" in lower or "univariate" in lower:
+    if "anova" in lower or "unianova" in lower or "oneway" in lower or "主体间" in lower or "univariate" in lower:
         return "ANOVA"
     if "regression" in lower or "回归" in lower:
         return "REGRESSION"
@@ -769,10 +769,14 @@ def _extract_regression_from_oms(xml_path: str) -> dict[str, float]:
 
 
 def _extract_anova_from_oms(xml_path: str) -> dict[str, float]:
-    """Extract ANOVA (UNIANOVA) statistics from OMS XML.
+    """Extract ANOVA (ONEWAY / UNIANOVA) statistics from OMS XML.
 
-    Navigates the 'Tests of Between-Subjects Effects' pivot table to
-    find factor variable rows and extract F, p-value, and df.
+    Navigates the ANOVA pivot table to find the 'Between Groups' row
+    and extract F, p-value, and df.
+
+    Handles two subType values:
+    - ``"ANOVA"`` — produced by the ONEWAY command
+    - ``"Tests of Between-Subjects Effects"`` — produced by UNIANOVA/GLM
 
     Returns dict with keys: f_value, p_value, df.
     """
@@ -780,29 +784,36 @@ def _extract_anova_from_oms(xml_path: str) -> dict[str, float]:
     root = tree.getroot()
     stats: dict[str, float] = {}
 
+    # Supported subType values for ANOVA tables
+    anova_subtypes = {"ANOVA", "Tests of Between-Subjects Effects"}
+
     for pivot in root.iter("{*}pivotTable"):
-        if pivot.get("subType", "") != "Tests of Between-Subjects Effects":
+        subtype = pivot.get("subType", "")
+        if subtype not in anova_subtypes:
             continue
 
+        # Walk all category elements to find "Between Groups" row
         for cat in pivot.iter("{*}category"):
-            if cat.get("variable") != "true":
-                continue
+            text = cat.get("text", "")
 
-            col_dim = cat.find("{*}dimension")
-            if col_dim is None:
-                continue
-
-            for stat_cat in col_dim.iter("{*}category"):
-                sname = stat_cat.get("text", "")
-                val = _find_cell_number(stat_cat)
-                if val is None:
+            # ONEWAY: "Source" dimension with "Between Groups" label
+            # UNIANOVA: variable="true" categories
+            if text == "Between Groups" or cat.get("variable") == "true":
+                col_dim = cat.find("{*}dimension")
+                if col_dim is None:
                     continue
-                if sname == "F":
-                    stats["f_value"] = val
-                elif sname == "Sig.":
-                    stats["p_value"] = val
-                elif sname == "df":
-                    stats["df"] = int(val)
+
+                for stat_cat in col_dim.iter("{*}category"):
+                    sname = stat_cat.get("text", "")
+                    val = _find_cell_number(stat_cat)
+                    if val is None:
+                        continue
+                    if sname == "F":
+                        stats["f_value"] = val
+                    elif sname == "Sig.":
+                        stats["p_value"] = val
+                    elif sname == "df" and "df" not in stats:
+                        stats["df"] = int(val)
 
     return stats
 

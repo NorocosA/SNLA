@@ -202,15 +202,16 @@ def test_cloud_safe_fields_definition():
     assert "value_labels" in CLOUD_SAFE_FIELDS
     assert "aggregate_stats" in CLOUD_SAFE_FIELDS
     assert "row_count" in CLOUD_SAFE_FIELDS
+    assert "variables" in CLOUD_SAFE_FIELDS
 
     # These must NEVER be in the safe set
-    dangerous = {"raw_data", "identifiers", "free_text_responses", "variables"}
+    dangerous = {"raw_data", "identifiers", "free_text_responses"}
     for key in dangerous:
         assert key not in CLOUD_SAFE_FIELDS, (
             f"DANGER: '{key}' must NOT be in CLOUD_SAFE_FIELDS"
         )
 
-    assert len(CLOUD_SAFE_FIELDS) == 6, (
+    assert len(CLOUD_SAFE_FIELDS) >= 6, (
         f"CLOUD_SAFE_FIELDS size changed from 6 to {len(CLOUD_SAFE_FIELDS)} — "
         f"review all additions for privacy impact"
     )

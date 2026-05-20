@@ -7,12 +7,17 @@ Provides two functions:
 """
 
 CLOUD_SAFE_FIELDS: set[str] = {
+    # Top-level metadata keys
+    "variables",
+    "row_count",
+    "column_count",
+    "filename",
+    # Field names within variable dicts (documentation reference)
     "variable_names",
     "variable_types",
     "variable_labels",
     "value_labels",
     "aggregate_stats",
-    "row_count",
 }
 
 SENSITIVE_VAR_PATTERNS: list[str] = [

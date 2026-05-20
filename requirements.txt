@@ -11,7 +11,9 @@ requests>=2.31           # HTTP client for LLM endpoints
 
 # Frontend — Desktop
 flask>=3.0               # Embedded HTTP API server
-# pywebview>=5.0          # Native WebView window (optional; requires .NET SDK to build)
+pywebview>=5.0           # Native WebView window (Windows: requires Edge WebView2 runtime)
+pythonnet>=3.1           # .NET CLR bridge for pywebview on Windows
+clr-loader>=0.2          # CLR host for pythonnet
 
 # Configuration
 python-dotenv>=1.0       # .env file loading

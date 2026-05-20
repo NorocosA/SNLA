@@ -28,6 +28,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from snla.parser.schema import AnalysisResult
+from snla.llm.client import LLMClient
+
 
 # ===========================================================================
 # Public API

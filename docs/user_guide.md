@@ -35,8 +35,12 @@ LLM_MODEL=deepseek-v4-flash
 ### 3. 启动
 
 ```powershell
-# 网页界面（推荐）
-streamlit run snla/ui/streamlit_app.py
+# 桌面窗口（推荐，需安装 pywebview）
+python launcher.py
+
+# 或浏览器模式（无需 pywebview）
+python snla/ui/server.py
+# 打开 http://127.0.0.1:8501
 
 # 命令行 Demo
 python scripts/e2e_demo.py --data-file data/fixtures/test_data.sav
@@ -46,11 +50,19 @@ python scripts/e2e_demo.py --data-file data/fixtures/test_data.sav
 
 ## 使用说明
 
-### 网页界面
+### 界面概览
 
-1. **上传数据**：左侧点击"Browse files"，选择 `.sav` 或 `.csv` 文件
+启动后，你会看到一个左右分栏的窗口：
+
+- **左侧边栏**：上传数据文件、查看变量列表、配置 LLM 和 SPSS 设置
+- **右侧主区域**：聊天窗口，输入分析需求，查看白话解读结果
+
+### 操作步骤
+
+1. **上传数据**：点击左侧「上传并分析」按钮，选择 `.sav` 或 `.csv` 文件
 2. **输入问题**：在底部输入框用自然语言描述分析需求
 3. **查看结果**：系统会自动推荐方法、生成语法、执行分析、返回白话解读
+4. **导出报告**：分析完成后点击右上角「📥 导出 Word 报告」按钮
 
 ### 支持的分析类型
 

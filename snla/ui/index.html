@@ -28,16 +28,23 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 #settings-toggle { cursor: pointer; font-size: 13px; color: #409eff; }
 #settings-panel { display: none; margin-top: 10px; }
 #settings-panel.open { display: block; }
-#settings-panel input { width: 100%; padding: 6px 8px; margin: 4px 0 8px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; }
+#settings-panel input, #settings-panel select { width: 100%; padding: 6px 8px; margin: 4px 0 8px; border: 1px solid #dcdfe6; border-radius: 4px; font-size: 12px; }
+#settings-panel select { display: none; }
 #settings-panel label { font-size: 12px; color: #606266; }
 #save-settings { width: 100%; padding: 6px; background: #67c23a; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; }
+#fetch-models-btn, #detect-spss-btn { width: 100%; padding: 6px; background: #409eff; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; margin-bottom: 8px; }
+#fetch-models-btn:hover, #detect-spss-btn:hover { background: #337ecc; }
+#fetch-models-btn:disabled, #detect-spss-btn:disabled { background: #a0cfff; cursor: not-allowed; }
 
 /* Main chat */
 #main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 #header { padding: 16px 24px; background: #fff; border-bottom: 1px solid #e4e7ed; font-size: 16px; font-weight: 600; display: flex; justify-content: space-between; align-items: center; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
 #export-btn { padding: 6px 14px; background: #e6a23c; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
 #export-btn:hover { background: #cf9236; }
 #export-btn:disabled { background: #f0c78e; cursor: not-allowed; }
+#stop-btn { padding: 6px 14px; background: #f56c6c; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; display: none; }
+#stop-btn:hover { background: #e04848; }
 
 #messages { flex: 1; overflow-y: auto; padding: 20px 24px; }
 .msg { margin-bottom: 16px; max-width: 85%; }
@@ -57,34 +64,66 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 @keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
 .error-msg { color: #f56c6c; font-size: 13px; }
 
+/* Context hint */
+#context-hint { display: none; padding: 8px 24px; background: #ecf5ff; border-top: 1px solid #d9ecff; border-bottom: 1px solid #d9ecff; font-size: 13px; color: #409eff; }
+
 /* Input area */
 #input-area { padding: 16px 24px; background: #fff; border-top: 1px solid #e4e7ed; display: flex; gap: 10px; }
 #user-input { flex: 1; padding: 10px 16px; border: 1px solid #dcdfe6; border-radius: 20px; font-size: 14px; outline: none; }
 #user-input:focus { border-color: #409eff; }
+#user-input:disabled { background: #f5f7fa; cursor: not-allowed; }
 #send-btn { width: 44px; height: 44px; background: #409eff; color: #fff; border: none; border-radius: 50%; cursor: pointer; font-size: 18px; flex-shrink: 0; }
 #send-btn:hover { background: #337ecc; }
 #send-btn:disabled { background: #a0cfff; cursor: not-allowed; }
 
 .status { text-align: center; color: #909399; font-size: 13px; padding: 10px; }
+
+/* Degradation card */
+.degradation-card { background: #fdf6ec; border-left: 4px solid #e6a23c; padding: 12px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; }
+.degradation-card .deg-title { font-weight: 600; color: #e6a23c; margin-bottom: 6px; }
+.degradation-card .deg-note { color: #606266; margin-bottom: 4px; }
+.degradation-card .deg-method { color: #909399; font-size: 12px; }
+.degradation-card .deg-syntax-toggle { font-size: 12px; color: #e6a23c; cursor: pointer; margin-top: 6px; display: inline-block; }
+.degradation-card pre { display: none; background: #fff; padding: 10px; border-radius: 6px; font-size: 12px; overflow-x: auto; margin-top: 6px; white-space: pre-wrap; border: 1px solid #f0e0c0; }
+.degradation-card pre.show { display: block; }
+
+/* Greylist modal */
+#greylist-modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; }
+#greylist-modal.open { display: flex; }
+.greylist-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 8px 32px rgba(0,0,0,0.2); max-width: 500px; width: 90%; }
+.greylist-card .gl-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+.greylist-card .gl-icon { font-size: 28px; }
+.greylist-card .gl-title { font-size: 18px; font-weight: 600; color: #1a1a2e; }
+.greylist-card .gl-message { font-size: 14px; color: #606266; margin-bottom: 12px; line-height: 1.6; }
+.greylist-card .gl-warnings { list-style: none; margin-bottom: 20px; }
+.greylist-card .gl-warnings li { padding: 6px 0; font-size: 13px; color: #e6a23c; border-bottom: 1px solid #f0f0f0; }
+.greylist-card .gl-warnings li:last-child { border-bottom: none; }
+.greylist-card .gl-warnings li::before { content: "(!) "; }
+.greylist-card .gl-actions { display: flex; gap: 10px; justify-content: flex-end; }
+.greylist-card .gl-btn { padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; font-size: 13px; }
+.gl-btn-cancel { background: #f5f7fa; color: #606266; }
+.gl-btn-cancel:hover { background: #e4e7ed; }
+.gl-btn-confirm { background: #409eff; color: #fff; }
+.gl-btn-confirm:hover { background: #337ecc; }
 </style>
 </head>
 <body>
 
 <!-- Sidebar -->
 <aside id="sidebar">
-    <h2>📊 SNLA</h2>
+    <h2>SNLA</h2>
     <div class="section">
-        <h3>📁 数据文件</h3>
+        <h3>数据文件</h3>
         <input type="file" id="file-input" accept=".sav,.csv">
-        <button id="upload-btn" disabled>上传并分析</button>
+        <button id="upload-btn">上传并分析</button>
         <div id="upload-status" class="status"></div>
     </div>
     <div class="section" id="var-section" style="display:none">
-        <h3>📋 变量概览 <span id="row-count"></span></h3>
+        <h3>变量概览 <span id="row-count"></span></h3>
         <div id="var-list"></div>
     </div>
     <div class="section">
-        <span id="settings-toggle">⚙️ 设置</span>
+        <span id="settings-toggle">设置</span>
         <div id="settings-panel">
             <label>LLM API 端点</label>
             <input id="s-endpoint" placeholder="https://opencode.ai/zen/go/v1/chat/completions">
@@ -92,9 +131,13 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
             <input id="s-key" type="password" placeholder="sk-...">
             <label>模型</label>
             <input id="s-model" placeholder="deepseek-v4-flash">
+            <button id="fetch-models-btn">获取模型列表</button>
+            <select id="s-model-select"></select>
             <label>SPSS Python 路径</label>
             <input id="s-spss" placeholder="C:\Program Files\IBM\SPSS\Statistics\26\Python3\python.exe">
-            <button id="save-settings">💾 保存</button>
+            <button id="detect-spss-btn">自动检测</button>
+            <select id="s-spss-select"></select>
+            <button id="save-settings">保存</button>
         </div>
     </div>
 </aside>
@@ -103,31 +146,54 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 <main id="main">
     <div id="header">
         <span>SPSS Natural Language Assistant</span>
-        <button id="export-btn" disabled>📥 导出 Word 报告</button>
+        <div class="header-actions">
+            <button id="stop-btn">停止</button>
+            <button id="export-btn" disabled>导出 Word 报告</button>
+        </div>
     </div>
     <div id="messages">
         <div class="msg assistant">
             <div class="bubble">
-                <strong>👋 欢迎使用 SPSS 自然语言助手！</strong><br><br>
+                <strong>欢迎使用 SPSS 自然语言助手！</strong><br><br>
                 用说话的方式完成统计分析。<br><br>
                 <strong>快速开始：</strong><br>
-                1. 👈 在左侧上传数据文件（.sav 或 .csv）<br>
-                2. ✍️ 在下方输入分析需求<br>
-                3. 📊 查看白话解读的结果<br><br>
+                1. 在左侧上传数据文件（.sav 或 .csv）<br>
+                2. 在下方输入分析需求<br>
+                3. 查看白话解读的结果<br><br>
                 <em>示例：比较男女生在成绩上是否有显著差异</em>
             </div>
         </div>
     </div>
+    <div id="context-hint"></div>
     <div id="input-area">
-        <input id="user-input" type="text" placeholder="输入你的分析需求，例如：比较男女生成绩差异" disabled>
-        <button id="send-btn" disabled>➤</button>
+        <input id="user-input" type="text" placeholder="输入你的分析需求，例如：比较男女成绩差异" disabled>
+        <button id="send-btn">→</button>
     </div>
 </main>
+
+<!-- Greylist Confirmation Modal -->
+<div id="greylist-modal">
+    <div class="greylist-card">
+        <div class="gl-header">
+            <span class="gl-icon">(!)</span>
+            <span class="gl-title">操作确认</span>
+        </div>
+        <p class="gl-message" id="gl-message"></p>
+        <ul class="gl-warnings" id="gl-warnings"></ul>
+        <div class="gl-actions">
+            <button class="gl-btn gl-btn-cancel" id="gl-cancel">取消</button>
+            <button class="gl-btn gl-btn-confirm" id="gl-confirm">确认执行</button>
+        </div>
+    </div>
+</div>
 
 <script>
 // ── State ────────────────────────────────────────────────
 let hasData = false;
 let hasAnalysis = false;
+let isExecuting = false;
+let lastUserInput = "";
+let lastAnalysis = null;
 
 // ── DOM ──────────────────────────────────────────────────
 const fileInput = document.getElementById("file-input");
@@ -140,8 +206,15 @@ const messagesEl = document.getElementById("messages");
 const userInput = document.getElementById("user-input");
 const sendBtn = document.getElementById("send-btn");
 const exportBtn = document.getElementById("export-btn");
+const stopBtn = document.getElementById("stop-btn");
 const settingsToggle = document.getElementById("settings-toggle");
 const settingsPanel = document.getElementById("settings-panel");
+const contextHint = document.getElementById("context-hint");
+const greylistModal = document.getElementById("greylist-modal");
+const glMessage = document.getElementById("gl-message");
+const glWarnings = document.getElementById("gl-warnings");
+const glCancel = document.getElementById("gl-cancel");
+const glConfirm = document.getElementById("gl-confirm");
 
 // ── File upload enable ───────────────────────────────────
 fileInput.addEventListener("change", () => {
@@ -165,15 +238,20 @@ async function uploadFile() {
         const data = await resp.json();
         if (data.ok) {
             hasData = true;
-            uploadStatus.textContent = `✅ ${data.filename} (${data.row_count} 行)`;
+            uploadStatus.textContent = `${data.filename} (${data.row_count} 行)`;
             userInput.disabled = false;
             sendBtn.disabled = false;
             renderVariables(data.variables, data.row_count);
+            // Clear multi-turn context and analysis state on new file upload
+            lastAnalysis = null;
+            hasAnalysis = false;
+            exportBtn.disabled = true;
+            contextHint.style.display = "none";
         } else {
-            uploadStatus.textContent = `❌ ${data.error}`;
+            uploadStatus.textContent = `错误: ${data.error}`;
         }
     } catch (e) {
-        uploadStatus.textContent = `❌ 上传失败: ${e.message}`;
+        uploadStatus.textContent = `上传失败: ${e.message}`;
     }
     uploadBtn.disabled = !fileInput.files.length;
 }
@@ -190,6 +268,26 @@ function renderVariables(vars, rows) {
     `).join("");
 }
 
+// ── Stop ─────────────────────────────────────────────────
+stopBtn.addEventListener("click", stopExecution);
+
+async function stopExecution() {
+    try {
+        await fetch("/api/cancel", { method: "POST" });
+    } catch (e) {
+        // Ignore cancel errors
+    }
+    hideGreylistModal();   // Close modal if open (prevents race with stop button)
+    setExecuting(false);
+}
+
+function setExecuting(executing) {
+    isExecuting = executing;
+    stopBtn.style.display = executing ? "inline-block" : "none";
+    userInput.disabled = executing;
+    sendBtn.disabled = executing;
+}
+
 // ── Send ─────────────────────────────────────────────────
 sendBtn.addEventListener("click", sendMessage);
 userInput.addEventListener("keydown", e => { if (e.key === "Enter") sendMessage(); });
@@ -198,10 +296,10 @@ async function sendMessage() {
     const text = userInput.value.trim();
     if (!text || !hasData) return;
 
+    lastUserInput = text;
     addMessage("user", text);
     userInput.value = "";
-    userInput.disabled = true;
-    sendBtn.disabled = true;
+    setExecuting(true);
 
     const loadingId = addMessage("assistant", '<span class="loading"></span><span class="loading"></span><span class="loading"></span> 正在分析...');
 
@@ -214,25 +312,91 @@ async function sendMessage() {
         const data = await resp.json();
         removeMessage(loadingId);
 
+        // Check for greylist confirmation FIRST (server returns ok=false)
+        if (data.requires_confirmation) {
+            showGreylistModal(data);
+            return; // Keep inputs disabled until user confirms/cancels
+        }
+
         if (data.ok) {
             hasAnalysis = true;
             exportBtn.disabled = false;
             addAnalysisResult(data);
         } else {
-            addMessage("assistant", `<span class="error-msg">❌ ${esc(data.error)}</span>`);
+            if (data.cancelled) {
+                addMessage("assistant", `<span class="error-msg">分析已取消</span>`);
+            } else {
+                addMessage("assistant", `<span class="error-msg">${esc(data.error)}</span>`);
+            }
             if (data.syntax) {
-                addMessage("assistant", `<span class="syntax-toggle" onclick="this.nextElementSibling.classList.toggle('show')">📝 查看语法</span><pre>${esc(data.syntax)}</pre>`);
+                addMessage("assistant", `<span class="syntax-toggle" onclick="this.nextElementSibling.classList.toggle('show')">[查看语法]</span><pre>${esc(data.syntax)}</pre>`);
             }
         }
     } catch (e) {
         removeMessage(loadingId);
-        addMessage("assistant", `<span class="error-msg">❌ 请求失败: ${esc(e.message)}</span>`);
+        addMessage("assistant", `<span class="error-msg">请求失败: ${esc(e.message)}</span>`);
     }
 
-    userInput.disabled = false;
-    sendBtn.disabled = false;
+    setExecuting(false);
     userInput.focus();
 }
+
+// ── Greylist Modal ───────────────────────────────────────
+function showGreylistModal(data) {
+    glMessage.textContent = data.message || "此操作可能需要确认。";
+    glWarnings.innerHTML = "";
+    if (data.greylist_warnings && data.greylist_warnings.length) {
+        data.greylist_warnings.forEach(w => {
+            const li = document.createElement("li");
+            li.textContent = w;
+            glWarnings.appendChild(li);
+        });
+    }
+    greylistModal.classList.add("open");
+}
+
+function hideGreylistModal() {
+    greylistModal.classList.remove("open");
+}
+
+glCancel.addEventListener("click", () => {
+    hideGreylistModal();
+    setExecuting(false);
+    userInput.focus();
+});
+
+glConfirm.addEventListener("click", async () => {
+    hideGreylistModal();
+    // Show loading in chat
+    const loadingId = addMessage("assistant", '<span class="loading"></span><span class="loading"></span><span class="loading"></span> 确认中...');
+
+    try {
+        const resp = await fetch("/api/confirm", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: lastUserInput, confirm_greylist: true }),
+        });
+        const data = await resp.json();
+        removeMessage(loadingId);
+
+        if (data.ok) {
+            hasAnalysis = true;
+            exportBtn.disabled = false;
+            addAnalysisResult(data);
+        } else {
+            addMessage("assistant", `<span class="error-msg">${esc(data.error)}</span>`);
+            if (data.syntax) {
+                addMessage("assistant", `<span class="syntax-toggle" onclick="this.nextElementSibling.classList.toggle('show')">[查看语法]</span><pre>${esc(data.syntax)}</pre>`);
+            }
+        }
+    } catch (e) {
+        removeMessage(loadingId);
+        addMessage("assistant", `<span class="error-msg">确认请求失败: ${esc(e.message)}</span>`);
+    }
+
+    setExecuting(false);
+    userInput.focus();
+});
 
 // ── Messages ──────────────────────────────────────────────
 let msgId = 0;
@@ -252,12 +416,34 @@ function removeMessage(id) {
 }
 
 function addAnalysisResult(data) {
-    let html = `<strong>📊 ${esc(data.method)}</strong>`;
+    let html = "";
+
+    // Degradation card (Feature 3)
+    if (data.degradation) {
+        const deg = data.degradation;
+        const degId = `deg-${msgId + 1}`;
+        html += `<div class="degradation-card">`;
+        html += `<div class="deg-title">(!) 语法自动修正已用尽，已切换至标准模板</div>`;
+        if (deg.note) {
+            html += `<div class="deg-note">${esc(deg.note)}</div>`;
+        }
+        if (deg.method) {
+            html += `<div class="deg-method">尝试方法: ${esc(deg.method)}</div>`;
+        }
+        if (data.syntax) {
+            html += `<span class="deg-syntax-toggle" onclick="document.getElementById('${degId}').classList.toggle('show')">[查看完整语法]</span>`;
+            html += `<pre id="${degId}">${esc(data.syntax)}</pre>`;
+        }
+        html += `</div>`;
+    }
+
+    // Main result
+    html += `<strong>${esc(data.method)}</strong>`;
     if (data.explanation) {
         html += `<br><br>${formatExplanation(data.explanation)}`;
     }
-    if (data.syntax) {
-        html += `<br><span class="syntax-toggle" onclick="this.nextElementSibling.classList.toggle('show')">📝 查看语法</span><pre>${esc(data.syntax)}</pre>`;
+    if (data.syntax && !data.degradation) {
+        html += `<br><span class="syntax-toggle" onclick="this.nextElementSibling.classList.toggle('show')">[查看语法]</span><pre>${esc(data.syntax)}</pre>`;
     }
     if (data.result && data.result.statistics) {
         html += '<div class="stats">';
@@ -267,10 +453,27 @@ function addAnalysisResult(data) {
         html += '</div>';
     }
     addMessage("assistant", html);
+
+    // Multi-turn context (Feature 4)
+    if (data.last_analysis) {
+        lastAnalysis = data.last_analysis;
+        updateContextHint();
+    }
 }
 
 function formatExplanation(text) {
     return text.replace(/\n/g, "<br>").replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+}
+
+// ── Context Hint ──────────────────────────────────────────
+function updateContextHint() {
+    if (lastAnalysis) {
+        const method = esc(lastAnalysis.method || "分析");
+        contextHint.innerHTML = `上一次分析: <strong>${method}</strong> — 你可以继续追问，例如"那换成班级呢？"`;
+        contextHint.style.display = "block";
+    } else {
+        contextHint.style.display = "none";
+    }
 }
 
 // ── Export ────────────────────────────────────────────────
@@ -295,7 +498,7 @@ exportBtn.addEventListener("click", async () => {
         alert("导出失败: " + e.message);
     }
     exportBtn.disabled = false;
-    exportBtn.textContent = "📥 导出 Word 报告";
+    exportBtn.textContent = "导出 Word 报告";
 });
 
 // ── Settings ──────────────────────────────────────────────
@@ -313,16 +516,96 @@ document.getElementById("save-settings").addEventListener("click", async () => {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(data),
         });
-        alert("✅ 设置已保存");
+        alert("设置已保存");
     } catch (e) {
         alert("保存失败: " + e.message);
     }
 });
 
+// ── Model Fetch ───────────────────────────────────────────
+document.getElementById("fetch-models-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("fetch-models-btn");
+    const endpoint = document.getElementById("s-endpoint").value.trim();
+    const apiKey = document.getElementById("s-key").value.trim();
+    if (!endpoint || !apiKey) {
+        alert("请先输入 API 端点和 Key");
+        return;
+    }
+    btn.disabled = true; btn.textContent = "获取中...";
+    try {
+        const resp = await fetch("/api/models", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify({endpoint, api_key: apiKey}),
+        });
+        const data = await resp.json();
+        if (data.ok && data.models) {
+            const select = document.getElementById("s-model-select");
+            select.innerHTML = '<option value="">-- 选择模型 --</option>';
+            data.models.forEach(m => {
+                const opt = document.createElement("option");
+                opt.value = m;
+                opt.textContent = m;
+                select.appendChild(opt);
+            });
+            select.style.display = "block";
+        } else {
+            alert("获取失败: " + (data.error || "未知错误"));
+        }
+    } catch(e) { alert("请求失败: " + e.message); }
+    btn.disabled = false; btn.textContent = "获取模型列表";
+});
+document.getElementById("s-model-select").addEventListener("change", (e) => {
+    if (e.target.value) document.getElementById("s-model").value = e.target.value;
+});
+
+// ── SPSS Detection ────────────────────────────────────────
+document.getElementById("detect-spss-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("detect-spss-btn");
+    btn.disabled = true; btn.textContent = "检测中...";
+    try {
+        const resp = await fetch("/api/detect-spss");
+        const data = await resp.json();
+        if (data.ok && data.candidates && data.candidates.length > 0) {
+            const select = document.getElementById("s-spss-select");
+            select.innerHTML = '<option value="">-- 选择 SPSS 版本 --</option>';
+            data.candidates.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.path;
+                opt.textContent = `SPSS ${c.version} — ${c.path}`;
+                select.appendChild(opt);
+            });
+            select.style.display = "block";
+            if (data.candidates.length === 1) {
+                select.value = data.candidates[0].path;
+                document.getElementById("s-spss").value = data.candidates[0].path;
+            }
+        } else {
+            alert("未检测到 SPSS 安装，请手动输入路径");
+        }
+    } catch(e) { alert("检测失败: " + e.message); }
+    btn.disabled = false; btn.textContent = "自动检测";
+});
+document.getElementById("s-spss-select").addEventListener("change", (e) => {
+    if (e.target.value) document.getElementById("s-spss").value = e.target.value;
+});
+
+// ── Load saved settings on startup ─────────────────────
+(async function loadSettings() {
+    try {
+        const resp = await fetch("/api/settings");
+        const data = await resp.json();
+        if (data.LLM_ENDPOINT) document.getElementById("s-endpoint").value = data.LLM_ENDPOINT;
+        if (data.LLM_API_KEY) document.getElementById("s-key").value = data.LLM_API_KEY;
+        if (data.LLM_MODEL) document.getElementById("s-model").value = data.LLM_MODEL;
+        if (data.SPSS_PYTHON_PATH) document.getElementById("s-spss").value = data.SPSS_PYTHON_PATH;
+    } catch(e) { /* ignore — settings will be loaded on next save */ }
+})();
+
 // ── Utils ─────────────────────────────────────────────────
 function esc(s) {
     if (!s) return "";
-    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+    return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#39;");
 }
 </script>
 </body>

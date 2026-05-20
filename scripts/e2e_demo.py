@@ -188,7 +188,10 @@ def _mock_intent(user_input: str) -> dict:
     compare_words = ("比较", "差异", "差别", "显著", "差得", "compare", "diff", "男生", "女生", "男女", "不同", "区别")
     if any(w in lower for w in compare_words):
         # Hint: "不同班级" / "各班级" / "几个班" → multi-group → ANOVA rather than t-test
-        multi_group_hints = ("各", "不同班", "多个", "三种", "三级", "四组", "几组", "各组", "几个班", "几个组")
+        # Hint: "不同班级" / "各班级" / "几个班" → multi-group → ANOVA rather than t-test
+        multi_group_hints = ("各", "不同班", "多个", "三种", "三级", "四组", "几组", "各组", "几个班", "几个组",
+                              "不同.*等级", "不同.*类型", "几种", "几类", "各类",
+                              "舱位", "不同舱", "几种舱")
         method = "oneway_anova" if any(w in lower for w in multi_group_hints) else "independent_t_test"
         return {"intent": "compare_groups", "confidence": 0.9, "rationale": "MOCK keyword match",
                 "modified_variable": None, "suggested_method": method}

@@ -157,7 +157,8 @@ class SPSSExecutor:
             syntax: SPSS syntax string (OMS wrapping added automatically).
             data_path: Path to the ``.sav`` data file to analyse.
             output_name: Name prefix for generated output files.
-            cancellation_token: Not used in Python mode.
+            cancellation_token: Set to ``True`` from another thread to
+                request cancellation of the running SPSS subprocess.
 
         Returns:
             An ``ExecutionResult`` summarising the outcome.
@@ -173,7 +174,8 @@ class SPSSExecutor:
         wrapped: str = self._wrap_and_preamble(syntax, data_path, xml_path)
 
         if self.exec_mode == "python":
-            return self._run_via_python(wrapped, xml_path, run_dir, start_time)
+            return self._run_via_python(wrapped, xml_path, run_dir, start_time,
+                                        cancellation_token)
         else:
             return self._run_via_batch(wrapped, xml_path, output_name, run_dir,
                                        start_time, cancellation_token)
@@ -188,8 +190,15 @@ class SPSSExecutor:
         xml_path: str,
         run_dir: str,
         start_time: float,
+        cancellation_token: bool = False,
     ) -> ExecutionResult:
-        """Execute SPSS syntax via SPSS's bundled Python interpreter."""
+        """Execute SPSS syntax via SPSS's bundled Python interpreter.
+
+        Uses a polling loop (instead of blocking ``communicate``) so that
+        an external caller can request cancellation via the
+        *cancellation_token* flag — the process handle is stored on
+        ``self._process`` so :meth:`terminate` can kill it.
+        """
         # Write syntax to a .sps file (avoid escaping hell)
         sps_file = os.path.join(run_dir, "_syntax.sps")
         with open(sps_file, "w", encoding="utf-8") as sf:
@@ -206,6 +215,11 @@ class SPSSExecutor:
             f.write("spss.Submit(syntax)\n")
             f.write("print('SPSS_DONE')\n")
 
+        stdout = ""
+        stderr = ""
+        exit_code: int = -1
+        proc: subprocess.Popen | None = None
+
         try:
             proc = subprocess.Popen(
                 [self.spss_python, os.path.abspath(py_script)],
@@ -216,14 +230,44 @@ class SPSSExecutor:
                 encoding="utf-8",
                 errors="replace",
             )
+            self._process = proc
 
-            stdout, stderr = proc.communicate(timeout=SPSS_EXECUTION_TIMEOUT)
-            exit_code = proc.returncode
+            # Polling loop — allows cancellation via terminate()
+            deadline = time.perf_counter() + SPSS_EXECUTION_TIMEOUT
+            while True:
+                if cancellation_token:
+                    proc.terminate()
+                    exit_code = -1
+                    stdout, stderr = proc.communicate(timeout=5)
+                    break
+
+                retcode = proc.poll()
+                if retcode is not None:
+                    exit_code = retcode
+                    stdout, stderr = proc.communicate(timeout=5)
+                    break
+
+                if time.perf_counter() >= deadline:
+                    proc.terminate()
+                    exit_code = -1
+                    stdout, stderr = proc.communicate(timeout=5)
+                    if DEBUG:
+                        print(f"[SPSSExecutor] Timeout ({SPSS_EXECUTION_TIMEOUT}s) — terminating")
+                    break
+
+                time.sleep(0.3)
 
         except subprocess.TimeoutExpired:
-            proc.kill()
-            stdout, stderr = proc.communicate(timeout=5)
+            if proc is not None and proc.poll() is None:
+                proc.kill()
+                stdout, stderr = proc.communicate(timeout=5)
             exit_code = -1
+        except Exception:
+            if proc is not None and proc.poll() is None:
+                proc.terminate()
+            raise
+        finally:
+            self._process = None
 
         duration = time.perf_counter() - start_time
         xml_exists = os.path.isfile(xml_path)
