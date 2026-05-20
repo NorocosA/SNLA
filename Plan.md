@@ -630,6 +630,56 @@ SPSS 输出解析结果
 | 3 条 E2E 真实 SPSS 全部通过 | ✅ |
 | AGENTS.md / README 更新 | ✅ |
 
+---
+
+## 五、Phase 5-7 — 多后端 + 多渠道扩展（2026 Q2-Q3）
+
+> **背景**：竞品调研发现 16 个 NL→统计 项目。SNLA 是唯一同时具备桌面 GUI + SPSS 集成 + 模板语法 + 安全沙箱的组合。
+> 但强制依赖 SPSS 是最大瓶颈。新阶段的核心策略：**下沉后端（加 Python/R），拓宽前端（加 OpenClaw/微信）。**
+
+### P5 — 多后端引擎（预计 16h，Week 1-2）
+
+| # | 任务 | 产出 | 工时 |
+|---|------|------|------|
+| P5-1 | Python 统计后端 (pingouin) | `snla/executor/python.py` — 12 种分析模板 | 8h |
+| P5-2 | 后端路由器 + 设置 UI | `snla/executor/router.py` + 前端下拉选择 | 4h |
+| P5-3 | 双后端对比验证 | `p0_output/backend_comparison.csv` | 2h |
+| P5-4 | SPSS 可选化 | 无 SPSS 也能启动、Python 后端跳过 SPSS 校验 | 2h |
+
+**产物**：用户可在设置中选择 SPSS 或 Python 后端。Python 后端零许可费、零新依赖。
+
+### P6 — 多渠道前端（预计 10h，Week 3）
+
+| # | 任务 | 产出 | 工时 |
+|---|------|------|------|
+| P6-1 | MCP Server 包装 | `snla/mcp_server.py` — 暴露 upload/analyze/cancel/export | 4h |
+| P6-2 | OpenClaw Skill | `.opencode/skills/snla/SKILL.md` — 工作流指引 | 2h |
+| P6-3 | 多渠道端到端验证 | WhatsApp/Telegram/微信 通道验证 | 4h |
+
+**产物**：用户无需安装桌面客户端，在微信/Telegram 里直接输入统计问题即可得到结果。
+
+### P7 — 体验与质量（预计 7h，Week 4-5）
+
+| # | 任务 | 产出 | 工时 |
+|---|------|------|------|
+| P7-1 | Flask API 测试 | `snla/tests/test_server.py` | 3h |
+| P7-2 | server.py 模块拆分 | `snla/orchestrator/` 子模块 | 2h |
+| P7-3 | Black + Ruff 格式化 | `pyproject.toml` + 全项目统一风格 | 0.5h |
+| P7-4 | 项目更名评估 | 候选：StatsTalk / StatBridge / 保留 SNLA | 1h |
+
+**产物**：代码质量提升、可维护性增强、品牌定位明确。
+
+### 目标架构
+
+```
+用户 ─→ 微信/Telegram (OpenClaw Skill) ┐
+                                        ├─→ SNLA MCP Server ─→ 后端路由 ─┬─ SPSS
+用户 ─→ 桌面窗口 (PyWebView)           ┘                                 ├─ Python (pingouin)
+                                                                          └─ R (可选)
+```
+
+---
+
 ### P0 补充细节
 
 **P0 交付物明细**：

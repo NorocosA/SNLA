@@ -122,15 +122,20 @@ docs/                # user_guide.md
 - [x] P0-1: Fix FREQUENCIES OMS parser for string variables
 - [x] P0-1: ONEWAY empty XML detection on string grouping vars
 
-### Remaining (from improvement plan)
+### Next: P5–P7 (multi-backend + multi-channel)
 
-| # | Priority | Task | Est. |
-|---|----------|------|------|
-| 3 | P1 | Add Flask API tests (`test_server.py`) | 3h |
-| 4 | P1 | Split `server.py` → `orchestrator/` module | 2h |
-| 5 | P1 | Add `executor/spss.py` integration tests | 2h |
-| 6 | P2 | Configure Black + Ruff | 30m |
-| 7 | P2 | Upgrade MOCK classifier keywords | 2h |
-| 9 | P3 | SPSS GRAPH chart support | 4h |
+| # | Phase | Task | Est. |
+|---|-------|------|------|
+| P5-1 | P5 | Add Python backend (`snla/executor/python.py` — pingouin) | 8h |
+| P5-2 | P5 | Backend router + settings UI | 4h |
+| P5-3 | P5 | Dual-backend comparison validation | 2h |
+| P5-4 | P5 | Make SPSS optional (no-SPSS mode) | 2h |
+| P6-1 | P6 | MCP Server wrapper (`snla/mcp_server.py`) | 4h |
+| P6-2 | P6 | OpenClaw Skill (`SKILL.md`) | 2h |
+| P6-3 | P6 | Multi-channel E2E (WhatsApp/Telegram/WeChat) | 4h |
+| P7-1 | P7 | Flask API tests (`test_server.py`) | 3h |
+| P7-2 | P7 | Split `server.py` → `orchestrator/` module | 2h |
+| P7-3 | P7 | Black + Ruff code formatting | 0.5h |
+| P7-4 | P7 | Project rename evaluation | 1h |
 
-> Full plan: `.sisyphus/improvement-plan.md`
+> Full plan: `.sisyphus/improvement-plan.md` | Strategy: `.sisyphus/strategy.md`
