@@ -46,6 +46,9 @@ SPSS_EXECUTION_TIMEOUT = int(os.getenv("SPSS_EXECUTION_TIMEOUT", "120"))  # 秒
 SPSS_MAX_RETRIES = int(os.getenv("SPSS_MAX_RETRIES", "2"))
 P0_OUTPUT_DIR = os.getenv("P0_OUTPUT_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "p0_output"))
 
+# ========== 统计后端选择 ==========
+STATS_BACKEND = os.getenv("STATS_BACKEND", "spss")  # "spss" | "python"
+
 # ========== 调试与审计 ==========
 LLM_CALL_LOG = os.getenv("LLM_CALL_LOG", "false").lower() == "true"
 LLM_MOCK = os.getenv("LLM_MOCK", "false").lower() == "true"

@@ -22,7 +22,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from flask import Flask, request, jsonify, send_from_directory
 
-from snla.config import DEBUG, LLM_MOCK
+from snla.config import DEBUG, LLM_MOCK, STATS_BACKEND
 from snla.session import SessionState
 from snla.data.reader import read_and_extract
 from snla.data.sanitizer import filter_for_cloud
@@ -146,6 +146,36 @@ def analyze():
     try:
         # ── Phase 1: Analysis Planning (intent + method + vars, 1 LLM call) ──
         method, plan_explanation, gvar, tvar = _phase1_plan(user_input)
+
+        # ── Python backend fast path ───────────────────────────────
+        if STATS_BACKEND == "python":
+            df = _load_dataframe()
+            if df is None:
+                _executing = False; _active_executor = None
+                return jsonify({"error": "Failed to load dataset for Python backend"}), 500
+            from snla.executor.python import PythonStatsExecutor
+            py_exec = PythonStatsExecutor()
+            result = py_exec.execute(method, df, grouping_var=gvar, test_var=tvar,
+                                     dep_var=gvar, indep_var=tvar)
+            explanation = _phase2_explain(result, method, user_input)
+            session.history.append({"role": "user", "content": user_input})
+            session.history.append({"role": "assistant", "content": explanation,
+                                     "method": method, "result": result})
+            session.last_analysis = {"method": method}
+            _executing = False; _active_executor = None
+            return jsonify({
+                "ok": True, "method": method, "backend": "python",
+                "plan_explanation": plan_explanation,
+                "result": {
+                    "analysis_type": result.analysis_type,
+                    "tables": [{"title": t.title, "rows": t.rows} for t in result.tables],
+                    "statistics": result.statistics,
+                    "n_valid": result.n_valid,
+                    "parser_used": result.parser_used,
+                },
+                "explanation": explanation,
+                "last_analysis": session.last_analysis,
+            })
 
         # ── Execution: Syntax from template (deterministic, fast) ──
         syntax = _syntax_template(method, grouping_var=gvar, test_var=tvar)
@@ -383,6 +413,7 @@ def settings():
             "LLM_API_KEY": cfg.LLM_API_KEY,
             "LLM_MODEL": cfg.LLM_MODEL,
             "SPSS_PYTHON_PATH": cfg.SPSS_PYTHON_PATH,
+            "STATS_BACKEND": cfg.STATS_BACKEND,
         })
 
     # ── POST: update settings ─────────────────────────────
@@ -391,7 +422,7 @@ def settings():
     changed = []
 
     # ── Update in-memory config ────────────────────────────
-    for key in ("LLM_ENDPOINT", "LLM_API_KEY", "LLM_MODEL", "SPSS_PYTHON_PATH"):
+    for key in ("LLM_ENDPOINT", "LLM_API_KEY", "LLM_MODEL", "SPSS_PYTHON_PATH", "STATS_BACKEND"):
         if key in data and data[key]:
             setattr(cfg, key, data[key])
             changed.append(key)
@@ -416,7 +447,7 @@ def _save_env_file():
     else:
         existing = []
 
-    managed = {"SPSS_PYTHON_PATH", "LLM_ENDPOINT", "LLM_API_KEY", "LLM_MODEL"}
+    managed = {"SPSS_PYTHON_PATH", "LLM_ENDPOINT", "LLM_API_KEY", "LLM_MODEL", "STATS_BACKEND"}
     updated = set()
     for line in existing:
         stripped = line.strip()
@@ -856,6 +887,27 @@ def _llm_fix_syntax(failed_syntax: str, error_text: str) -> str | None:
 def _has_llm() -> bool:
     from snla.config import LLM_API_KEY
     return bool(LLM_API_KEY)
+
+
+def _load_dataframe():
+    """Load the uploaded dataset as a pandas DataFrame for Python backend."""
+    file_path = session.dataset_meta.get("file_path", "")
+    if not file_path or not os.path.isfile(file_path):
+        return None
+    suffix = os.path.splitext(file_path)[1].lower()
+    try:
+        if suffix in (".sav",):
+            import pyreadstat
+            df, _ = pyreadstat.read_sav(file_path)
+            return df
+        elif suffix == ".csv":
+            import pandas as pd
+            return pd.read_csv(file_path)
+        else:
+            import pandas as pd
+            return pd.read_csv(file_path)
+    except Exception:
+        return None
 
 # ── MOCK fallbacks ────────────────────────────────────────────────────
 
