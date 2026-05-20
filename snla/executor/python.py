@@ -107,6 +107,14 @@ class PythonStatsExecutor:
         g1 = data[data[gv] == groups[0]][tv].dropna()
         g2 = data[data[gv] == groups[1]][tv].dropna() if len(groups) > 1 else pd.Series(dtype=float)
 
+        if len(g1) < 2 or len(g2) < 2:
+            return AnalysisResult(
+                analysis_type="T-TEST",
+                notes=[f"Python backend: insufficient data for t-test "
+                       f"(group sizes: {len(g1)}, {len(g2)}). Need ≥2 per group."],
+                parser_used="python_pingouin",
+            )
+
         res = pg.ttest(g1, g2, correction="auto")
         t_val = float(res["T"].iloc[0])
         p_val = float(res["p_val"].iloc[0])
@@ -276,25 +284,37 @@ class PythonStatsExecutor:
     # ==================================================================
 
     def _correlation_pearson(
-        self, data: pd.DataFrame = None, **__: Any,
+        self, data: pd.DataFrame | None = None, **__: Any,
     ) -> AnalysisResult:
-        return self._correlation(data, method="pearson")
+        return self._correlation(data, method="pearson")  # type: ignore[arg-type]
 
     def _correlation_spearman(
-        self, data: pd.DataFrame, **__: Any,
+        self, data: pd.DataFrame | None = None, **__: Any,
     ) -> AnalysisResult:
-        return self._correlation(data, method="spearman")
+        return self._correlation(data, method="spearman")  # type: ignore[arg-type]
 
     def _correlation(
-        self, data: pd.DataFrame, method: str = "pearson",
+        self, data: pd.DataFrame | None = None, method: str = "pearson",
     ) -> AnalysisResult:
+        if data is None:
+            return AnalysisResult(
+                analysis_type="CORRELATIONS",
+                notes=["Python backend: no data provided"],
+                parser_used="python_pingouin",
+            )
         import pingouin as pg
 
         # Pick two numeric columns
         nums = [c for c in data.columns if pd.api.types.is_numeric_dtype(data[c])
                 and c.lower() not in ("id",)]
-        v1 = nums[0] if nums else data.columns[0]
-        v2 = nums[1] if len(nums) > 1 else data.columns[0]
+        if len(nums) < 2:
+            return AnalysisResult(
+                analysis_type="CORRELATIONS",
+                notes=["Python backend: need ≥2 numeric columns for correlation"],
+                parser_used="python_pingouin",
+            )
+        v1 = nums[0]
+        v2 = nums[1]
         clean = data[[v1, v2]].dropna()
 
         res = pg.corr(clean[v1], clean[v2], method=method)
@@ -456,6 +476,13 @@ class PythonStatsExecutor:
 
         g1 = data[data[gv] == groups[0]][tv].dropna()
         g2 = data[data[gv] == groups[1]][tv].dropna() if len(groups) > 1 else pd.Series(dtype=float)
+
+        if len(g1) < 2 or len(g2) < 2:
+            return AnalysisResult(
+                analysis_type="MANN_WHITNEY",
+                notes=[f"Python backend: insufficient data (group sizes: {len(g1)}, {len(g2)})"],
+                parser_used="python_pingouin",
+            )
 
         res = pg.mwu(g1, g2)
         u_val = float(res["U_val"].iloc[0])
