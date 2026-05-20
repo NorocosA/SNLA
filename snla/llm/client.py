@@ -299,7 +299,7 @@ class LLMClient:
             raise LLMError("OpenAI-compatible response missing 'choices'")
 
         message = choices[0].get("message", {})
-        content: str = message.get("content", "")
+        content: str = message.get("content", "") or message.get("reasoning_content", "")
 
         usage_raw = data.get("usage", {})
         usage: dict[str, int] = {
