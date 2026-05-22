@@ -297,17 +297,24 @@ class PythonStatsExecutor:
     # ==================================================================
 
     def _correlation_pearson(
-        self, data: pd.DataFrame | None = None, **__: Any,
+        self, data: pd.DataFrame | None = None,
+        var1: str | None = None, var2: str | None = None,
+        **__: Any,
     ) -> AnalysisResult:
-        return self._correlation(data, method="pearson")  # type: ignore[arg-type]
+        return self._correlation(data, method="pearson",
+                                 var1=var1, var2=var2)  # type: ignore[arg-type]
 
     def _correlation_spearman(
-        self, data: pd.DataFrame | None = None, **__: Any,
+        self, data: pd.DataFrame | None = None,
+        var1: str | None = None, var2: str | None = None,
+        **__: Any,
     ) -> AnalysisResult:
-        return self._correlation(data, method="spearman")  # type: ignore[arg-type]
+        return self._correlation(data, method="spearman",
+                                 var1=var1, var2=var2)  # type: ignore[arg-type]
 
     def _correlation(
         self, data: pd.DataFrame | None = None, method: str = "pearson",
+        var1: str | None = None, var2: str | None = None,
     ) -> AnalysisResult:
         if data is None:
             return AnalysisResult(
@@ -317,17 +324,22 @@ class PythonStatsExecutor:
             )
         import pingouin as pg
 
-        # Pick two numeric columns
-        nums = [c for c in data.columns if pd.api.types.is_numeric_dtype(data[c])
-                and c.lower() not in ("id",)]
-        if len(nums) < 2:
-            return AnalysisResult(
-                analysis_type="CORRELATIONS",
-                notes=["Python backend: need ≥2 numeric columns for correlation"],
-                parser_used="python_pingouin",
-            )
-        v1 = nums[0]
-        v2 = nums[1]
+        # Use specified vars when provided and valid, else pick two numeric cols
+        if (var1 and var2 and var1 in data.columns and var2 in data.columns
+                and var1 != var2):
+            v1, v2 = var1, var2
+        else:
+            nums = [c for c in data.columns
+                    if pd.api.types.is_numeric_dtype(data[c])
+                    and c.lower() not in ("id",)]
+            if len(nums) < 2:
+                return AnalysisResult(
+                    analysis_type="CORRELATIONS",
+                    notes=["Python backend: need ≥2 numeric columns for correlation"],
+                    parser_used="python_pingouin",
+                )
+            v1 = nums[0]
+            v2 = nums[1]
         clean = data[[v1, v2]].dropna()
 
         res = pg.corr(clean[v1], clean[v2], method=method)
