@@ -92,6 +92,9 @@ _was_cancelled              # Set by /api/cancel
 | `snla/syntax/validator.py` | Blacklist, greylist, variable existence, bracket pairing |
 | `snla/syntax/templates.py` | Pre-built SPSS syntax for ~10 analysis types |
 | `snla/executor/spss.py` | SPSS subprocess manager, OMS XML wrapper, temp copies for greylist |
+| `snla/executor/python.py` | Python backend — pingouin covering 12 analysis types |
+| `snla/executor/adapter.py` | BackendAdapter — unified SPSS/Python interface with trust routing |
+| `snla/trust.py` | Trust whitelist loader — JSON at runtime, compile-time constant fallback |
 | `snla/parser/output.py` | OMS XML + regex dual parser (OMS primary, regex fallback) |
 | `snla/parser/schema.py` | `AnalysisResult`, `TableResult` dataclasses |
 | `snla/explainer/naturalize.py` | Constraint layer (p-value rules) + LLM polish (rules first, LLM decorates) |
@@ -121,16 +124,19 @@ docs/                # user_guide.md
 - [x] P4: 65-case real-LLM verification (incl. airline.sav 25K rows)
 - [x] P0-1: Fix FREQUENCIES OMS parser for string variables
 - [x] P0-1: ONEWAY empty XML detection on string grouping vars
+- [x] P5: Python backend — pingouin 12 methods, BackendAdapter, trust whitelist
+- [x] P5: SPSS optional — auto-detect, strategy C, restricted mode UI
+- [x] P5: Dual-backend validation — 51 cases, 0 conflicts, 11/12 trusted
 
-### Next: P5–P7 (multi-backend + multi-channel)
+### Next: P6–P7 (multi-channel + quality)
 
 | # | Phase | Task | Status |
 |---|-------|------|--------|
 | P5-1 | P5 | Add Python backend (`snla/executor/python.py` — pingouin) | ✅ Done |
 | P5-2 | P5 | Backend router + settings UI | ✅ Done |
-| P5-3 | P5 | Dual-backend comparison validation | ⬜ Next |
-| P5-4 | P5 | Make SPSS optional (no-SPSS mode) | ⬜ |
-| P6-1 | P6 | MCP Server wrapper (`snla/mcp_server.py`) | ⬜ |
+| P5-3 | P5 | Dual-backend comparison validation (51 cases, 11/12 trusted) | ✅ Done |
+| P5-4 | P5 | Make SPSS optional (no-SPSS mode, strategy C) | ✅ Done |
+| P6-1 | P6 | MCP Server wrapper (`snla/mcp_server.py`) | ⬜ Next |
 | P6-2 | P6 | OpenClaw Skill (`SKILL.md`) | ⬜ |
 | P6-3 | P6 | Multi-channel E2E (WhatsApp/Telegram/WeChat) | ⬜ |
 | P7-1 | P7 | Flask API tests (`test_server.py`) | ⬜ |
