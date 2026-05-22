@@ -64,6 +64,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
 @keyframes blink { 0%,80%,100% { opacity: 0; } 40% { opacity: 1; } }
 .error-msg { color: #f56c6c; font-size: 13px; }
 
+/* Limited mode warning */
+.limited-warning { background: #fdf6ec; border: 1px solid #fae2c6; border-radius: 8px; padding: 12px; margin-bottom: 8px; font-size: 13px; color: #e6a23c; }
+.limited-warning .lw-title { font-weight: 600; margin-bottom: 4px; }
+.limited-warning .lw-body { color: #606266; }
+
+/* Backend notification bar */
+#backend-notice { display: none; padding: 8px 24px; background: #fdf6ec; border-top: 1px solid #fae2c6; border-bottom: 1px solid #fae2c6; font-size: 13px; color: #e6a23c; line-height: 1.4; }
+#backend-notice.show { display: block; }
+#backend-notice .notice-link { color: #e6a23c; text-decoration: underline; cursor: pointer; }
+
 /* Context hint */
 #context-hint { display: none; padding: 8px 24px; background: #ecf5ff; border-top: 1px solid #d9ecff; border-bottom: 1px solid #d9ecff; font-size: 13px; color: #409eff; }
 
@@ -170,6 +180,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-
         </div>
     </div>
     <div id="context-hint"></div>
+    <div id="backend-notice"></div>
     <div id="input-area">
         <input id="user-input" type="text" placeholder="输入你的分析需求，例如：比较男女成绩差异" disabled>
         <button id="send-btn">→</button>
@@ -442,15 +453,41 @@ function addAnalysisResult(data) {
         html += `</div>`;
     }
 
-    // Main result
-    html += `<strong>${esc(data.method)}</strong>`;
-    if (data.explanation) {
-        html += `<br><br>${formatExplanation(data.explanation)}`;
+    // Show method name for limited mode
+    if (data.limited_mode) {
+        html += `<strong>${esc(data.method)}</strong><br><br>`;
+    }
+
+    // Limited mode warning (Strategy C — no-SPSS + untrusted method)
+    if (data.limited_mode && data.warning) {
+        html += '<div class="limited-warning">';
+        html += '<div class="lw-title">(!) 受限模式</div>';
+        html += '<div class="lw-body">' + esc(data.warning) + '</div>';
+        html += '</div>';
+    }
+    // When limited_mode, show raw stats more prominently
+    if (data.limited_mode) {
+        if (data.result && data.result.statistics) {
+            html += '<div class="stats" style="border-left: 3px solid #e6a23c; padding-left: 12px; background: #fdf6ec; padding: 8px 12px; border-radius: 4px; margin-bottom: 8px;">';
+            html += '<div style="font-weight:600;color:#e6a23c;margin-bottom:4px;">原始统计数字（仅供参考）</div>';
+            for (const [k, v] of Object.entries(data.result.statistics)) {
+                html += esc(k) + ': ' + esc(String(v)) + '<br>';
+            }
+            html += '</div>';
+        }
+    }
+
+    // Main result (suppress explanation when limited_mode)
+    if (!data.limited_mode) {
+        html += `<strong>${esc(data.method)}</strong>`;
+        if (data.explanation) {
+            html += `<br><br>${formatExplanation(data.explanation)}`;
+        }
     }
     if (data.syntax && !data.degradation) {
         html += `<br><span class="syntax-toggle" onclick="this.nextElementSibling.classList.toggle('show')">[查看语法]</span><pre>${esc(data.syntax)}</pre>`;
     }
-    if (data.result && data.result.statistics) {
+    if (data.result && data.result.statistics && !data.limited_mode) {
         html += '<div class="stats">';
         for (const [k, v] of Object.entries(data.result.statistics)) {
             html += `${esc(k)}: ${esc(String(v))}<br>`;
@@ -596,7 +633,7 @@ document.getElementById("s-spss-select").addEventListener("change", (e) => {
     if (e.target.value) document.getElementById("s-spss").value = e.target.value;
 });
 
-// ── Load saved settings on startup ─────────────────────
+// ── Load saved settings + auto-detect SPSS on startup ────
 (async function loadSettings() {
     try {
         const resp = await fetch("/api/settings");
@@ -606,7 +643,37 @@ document.getElementById("s-spss-select").addEventListener("change", (e) => {
         if (data.LLM_MODEL) document.getElementById("s-model").value = data.LLM_MODEL;
         if (data.SPSS_PYTHON_PATH) document.getElementById("s-spss").value = data.SPSS_PYTHON_PATH;
         if (data.STATS_BACKEND) document.getElementById("s-backend").value = data.STATS_BACKEND;
-    } catch(e) { /* ignore — settings will be loaded on next save */ }
+    } catch(e) { /* ignore */ }
+
+    // Auto-detect SPSS availability and auto-switch if needed
+    try {
+        const statusResp = await fetch("/api/status");
+        const status = await statusResp.json();
+        const backendSelect = document.getElementById("s-backend");
+        const notice = document.getElementById("backend-notice");
+        
+        if (!status.spss_available && backendSelect.value === "spss") {
+            // SPSS not available but backend is set to SPSS — auto-switch to Python
+            backendSelect.value = "python";
+            const trustedCount = status.trusted_methods ? status.trusted_methods.length : 0;
+            notice.innerHTML = '未检测到 SPSS，已自动切换至 <strong>Python 引擎</strong>。' +
+                'Python 引擎可完成 ' + trustedCount + ' 种常用分析的完整解读（含白话结论）。' +
+                ' <span class="notice-link" onclick="document.getElementById(\'settings-toggle\').click()">查看设置</span>';
+            notice.classList.add("show");
+        } else if (!status.spss_available) {
+            // Already on Python backend — show brief info
+            const trustedCount = status.trusted_methods ? status.trusted_methods.length : 0;
+            notice.innerHTML = '当前使用 <strong>Python 引擎</strong>（' + trustedCount + ' 种方法已通过 SPSS 交叉验证）。' +
+                ' <span class="notice-link" onclick="document.getElementById(\'settings-toggle\').click()">查看设置</span>';
+            notice.classList.add("show");
+        } else {
+            // SPSS is available — show brief info
+            notice.innerHTML = 'SPSS 引擎已就绪。可在设置中切换至 Python 引擎。';
+            notice.classList.add("show");
+            // Auto-hide the positive notice after 5 seconds
+            setTimeout(function() { notice.classList.remove("show"); }, 5000);
+        }
+    } catch(e) { /* /api/status unavailable — skip auto-detect */ }
 })();
 
 // ── Utils ─────────────────────────────────────────────────

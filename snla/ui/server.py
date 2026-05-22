@@ -23,6 +23,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from flask import Flask, request, jsonify, send_from_directory
 
 from snla.config import DEBUG, LLM_MOCK, STATS_BACKEND
+from snla.trust import is_method_trusted, get_trusted_methods, trust_loaded_from
 from snla.session import SessionState
 from snla.data.reader import read_and_extract
 from snla.data.sanitizer import filter_for_cloud
@@ -38,6 +39,25 @@ _executing: bool = False                   # True while /api/analyze is running
 _active_executor: "SPSSExecutor | None" = None  # for cancellation
 _pending_greylist: dict | None = None      # {syntax, warnings, method, intent} awaiting confirm
 _was_cancelled: bool = False               # True when user requested cancellation
+
+# ── P5-4: SPSS availability & method trust helpers ──────────────────
+
+def _spss_available() -> bool:
+    """Check if SPSS is available on this machine."""
+    from snla.config import check_spss_available
+    return check_spss_available()
+
+
+def _can_full_interpret(method: str) -> bool:
+    """Can we produce a full plain-language explanation for this method?
+
+    Returns True if:
+    - SPSS is available (always trust SPSS output), OR
+    - The method is in the trusted whitelist (no-SPSS mode)
+    """
+    if _spss_available():
+        return True
+    return is_method_trusted(method)
 
 # ── CORS for local WebView ────────────────────────────────────────────
 @app.after_request
@@ -55,11 +75,16 @@ def index():
 # ── Health ────────────────────────────────────────────────────────────
 @app.route("/api/status")
 def status():
+    import snla.config as cfg
     return jsonify({
         "ok": True,
         "has_data": session.dataset_meta is not None,
         "variable_count": len(session.variables),
         "executing": _executing,
+        "spss_available": _spss_available(),
+        "current_backend": cfg.STATS_BACKEND,
+        "trusted_methods": list(get_trusted_methods()),
+        "trust_source": trust_loaded_from(),  # "json" or "embedded"
     })
 
 # ── File Upload ───────────────────────────────────────────────────────
@@ -157,6 +182,35 @@ def analyze():
             py_exec = PythonStatsExecutor()
             result = py_exec.execute(method, df, grouping_var=gvar, test_var=tvar,
                                      dep_var=gvar, indep_var=tvar)
+
+            # P5-4: Strategy C — no-SPSS + untrusted method → raw numbers only
+            if not _can_full_interpret(method):
+                session.history.append({"role": "user", "content": user_input})
+                session.history.append({"role": "assistant", "content": None,
+                                         "method": method, "result": result})
+                session.last_analysis = {"method": method}
+                _executing = False; _active_executor = None
+                return jsonify({
+                    "ok": True, "method": method, "backend": "python",
+                    "plan_explanation": plan_explanation,
+                    "result": {
+                        "analysis_type": result.analysis_type,
+                        "tables": [{"title": t.title, "rows": t.rows} for t in result.tables],
+                        "statistics": result.statistics,
+                        "n_valid": result.n_valid,
+                        "parser_used": result.parser_used,
+                    },
+                    "explanation": None,  # 无白话解读 — 方法未经验证
+                    "warning": (
+                        f"Python 引擎下「{method}」方法的可靠性尚未经 SPSS 交叉验证。"
+                        f"以下为原始统计数字，非统计专业人士请谨慎解读。"
+                        f"建议安装 SPSS 以获得完整解读。"
+                    ),
+                    "limited_mode": True,
+                    "last_analysis": session.last_analysis,
+                })
+
+            # Trusted method or SPSS available → full explanation
             explanation = _phase2_explain(result, method, user_input)
             session.history.append({"role": "user", "content": user_input})
             session.history.append({"role": "assistant", "content": explanation,
