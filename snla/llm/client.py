@@ -8,6 +8,7 @@ and local ollama backends with automatic fallback.
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import requests
@@ -16,6 +17,8 @@ from snla import config
 
 logger = logging.getLogger(__name__)
 
+# Maximum number of retry attempts for LLM HTTP calls
+LLM_MAX_RETRIES = 3
 
 # ---------------------------------------------------------------------------
 # TLS adapter for servers with strict/complex SSL configurations
@@ -285,13 +288,31 @@ class LLMClient:
             "max_tokens": max_tokens,
         }
 
-        response = self._session.post(
-            endpoint,
-            headers=headers,
-            json=payload,
-            timeout=120,
-        )
-        response.raise_for_status()
+        max_retries = LLM_MAX_RETRIES
+        for attempt in range(max_retries + 1):
+            try:
+                response = self._session.post(
+                    endpoint,
+                    headers=headers,
+                    json=payload,
+                    timeout=120,
+                )
+                response.raise_for_status()
+                break  # success
+            except requests.RequestException as exc:
+                # Don't retry 4xx client errors
+                if isinstance(exc, requests.HTTPError) and exc.response is not None and exc.response.status_code < 500:
+                    raise
+                if attempt < max_retries:
+                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning(
+                        "LLM request failed (attempt %d/%d): %s. Retrying in %ds...",
+                        attempt + 1, max_retries + 1, exc, wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error("LLM request failed after %d attempts: %s", max_retries + 1, exc)
+                    raise
         data = response.json()
 
         choices = data.get("choices", [])
@@ -352,12 +373,30 @@ class LLMClient:
             },
         }
 
-        response = self._session.post(
-            endpoint,
-            json=payload,
-            timeout=120,
-        )
-        response.raise_for_status()
+        max_retries = LLM_MAX_RETRIES
+        for attempt in range(max_retries + 1):
+            try:
+                response = self._session.post(
+                    endpoint,
+                    json=payload,
+                    timeout=120,
+                )
+                response.raise_for_status()
+                break  # success
+            except requests.RequestException as exc:
+                # Don't retry 4xx client errors
+                if isinstance(exc, requests.HTTPError) and exc.response is not None and exc.response.status_code < 500:
+                    raise
+                if attempt < max_retries:
+                    wait = 2 ** attempt  # 1s, 2s, 4s
+                    logger.warning(
+                        "LLM request failed (attempt %d/%d): %s. Retrying in %ds...",
+                        attempt + 1, max_retries + 1, exc, wait,
+                    )
+                    time.sleep(wait)
+                else:
+                    logger.error("LLM request failed after %d attempts: %s", max_retries + 1, exc)
+                    raise
         data = response.json()
 
         message = data.get("message", {})
