@@ -49,9 +49,8 @@ def _phase2_explain(parsed, method: str, user_input: str) -> str:
 def _syntax_template(
     method: str, grouping_var: str | None = None, test_var: str | None = None
 ) -> str:
-    from snla.syntax.templates import get_syntax_by_method
-
     import snla.ui.server as _server
+    from snla.syntax.templates import get_syntax_by_method
 
     vars_list = _server.session.variables
     if not vars_list:
@@ -211,9 +210,8 @@ def _llm_fix_syntax(failed_syntax: str, error_text: str, method: str | None = No
     if LLM_MOCK or not _has_llm():
         return None
     try:
-        from snla.llm.client import LLMClient
-
         import snla.ui.server as _server
+        from snla.llm.client import LLMClient
 
         cloud_vars = filter_for_cloud({"variables": _server.session.variables}).get("variables", [])
         var_list = "\n".join(f"  - {v['name']} ({v.get('type', '?')})" for v in cloud_vars[:30])

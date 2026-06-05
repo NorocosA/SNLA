@@ -31,13 +31,13 @@ STATS_BACKEND=python    # 无需 SPSS
 ## 二、快速验证：跑测试（1 分钟）
 
 ```powershell
-# 全部 CI-safe 测试（87 tests）
+# 全部 CI-safe 测试（110 tests）
 python -m pytest snla/tests/ -v -m "not slow"
 ```
 
 **预期输出**：
 ```
-====================== 86 passed, 1 deselected in ~1s =======================
+=========== 108 passed, 1 deselected, 2 xfailed in ~2s ===========
 ```
 
 如果有失败，检查是否缺少依赖：`pip install flask lxml pingouin matplotlib`

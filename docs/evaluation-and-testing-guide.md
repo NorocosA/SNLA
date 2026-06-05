@@ -235,8 +235,8 @@ openclaw mcp set snla --command python --args "snla/mcp_server.py"
 
 ```powershell
 # 测试
-python -m pytest snla/tests/ -v                    # 全量 (87 tests)
-python -m pytest snla/tests/ -v -m "not slow"     # CI-safe (86 tests)
+python -m pytest snla/tests/ -v                    # 全量 (110 tests)
+python -m pytest snla/tests/ -v -m "not slow"     # CI-safe (108 pass + 2 xfail)
 python -m pytest snla/tests/test_server.py -v     # API 测试 (23 tests)
 python scripts/mcp_integration_test.py             # MCP 测试 (7 tests)
 

@@ -136,10 +136,7 @@ def reload_config() -> list[str]:
         if key not in string_keys:
             continue
         current = globals().get(key)
-        if current is None:
-            globals()[key] = value
-            changed.append(key)
-        elif str(current) != str(value):
+        if current is None or str(current) != str(value):
             globals()[key] = value
             changed.append(key)
 

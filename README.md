@@ -54,8 +54,8 @@ python scripts/e2e_demo.py --data-file data/fixtures/test_data.sav
 ## 测试
 
 ```powershell
-python -m pytest snla/tests/ -v                    # 87 单元/集成测试（不需要 SPSS/LLM）
-python -m pytest snla/tests/ -v -m "not slow"      # CI-safe (85 tests)
+python -m pytest snla/tests/ -v                    # 110 单元/集成测试（不需要 SPSS/LLM）
+python -m pytest snla/tests/ -v -m "not slow"      # CI-safe (108 pass + 2 xfail)
 python -m pytest snla/tests/test_server.py -v      # API 测试 (23 tests)
 python -m pytest snla/tests/test_python_backend.py -v  # Python 后端 (24 tests)
 python scripts/mcp_integration_test.py              # MCP 集成测试 (7/7)

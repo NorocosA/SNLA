@@ -22,33 +22,25 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from snla.config import DEBUG, LLM_MOCK, STATS_BACKEND
+from snla.config import DEBUG
 from snla.data.persistence import load_session, save_session
 from snla.data.reader import read_and_extract
 from snla.data.sanitizer import filter_for_cloud
-from snla.orchestrator import GreylistPending, NoPendingError, planner
+from snla.orchestrator import NoPendingError, planner
 from snla.session import SessionState
-from snla.trust import get_trusted_methods, is_method_trusted, trust_loaded_from
-
+from snla.trust import get_trusted_methods, trust_loaded_from
 from snla.ui._helpers import (
     RATE_LIMIT_MAX_REQUESTS,
     RATE_LIMIT_WINDOW,
-    _can_full_interpret,
     _check_rate_limit,
-    _has_llm,
-    _load_dataframe,
     _make_executor,
     _spss_available,
 )
 from snla.ui._pipeline import (
     _execute_and_parse,
-    _execute_syntax,
-    _llm_fix_syntax,
-    _parse_output,
     _phase2_explain,
     _prepare_syntax,
     _run_python_backend,
-    _syntax_template,
 )
 
 logger = logging.getLogger(__name__)

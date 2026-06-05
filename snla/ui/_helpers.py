@@ -12,8 +12,6 @@ import logging
 import os
 import time
 
-from snla.config import LLM_MOCK
-
 logger = logging.getLogger(__name__)
 
 # ── Rate limit constants (used by _check_rate_limit + server route error msg) ──

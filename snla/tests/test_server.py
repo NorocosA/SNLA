@@ -19,13 +19,11 @@ from __future__ import annotations
 
 import io
 import json
-import tempfile
 from unittest.mock import patch
 
 import pytest
 
-from snla.ui.server import app, session, planner
-
+from snla.ui.server import app, planner, session
 
 # ===========================================================================
 # Fixtures
@@ -413,6 +411,7 @@ class TestGreylistFlow:
     ):
         """Stage greylist → POST /api/confirm → execution succeeds."""
         from unittest.mock import MagicMock
+
         from snla.orchestrator import GreylistPending
 
         # Mock executor so execute_on_temp_copy doesn't touch filesystem

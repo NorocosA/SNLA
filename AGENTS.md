@@ -1,6 +1,6 @@
 # AGENTS.md — StatsTalk
 
-> Status: P7 Complete. 87 tests passing. Production-ready.
+> Status: All phases complete. 110 tests (108 pass + 2 xfail). Production-ready.
 
 ## Architecture
 
@@ -28,7 +28,7 @@ User (自然语言)
 | Dev run | `python launcher.py` (Flask + PyWebView window) |
 | API only | `python snla/ui/server.py` (Flask on port 8501) |
 | MCP server | `python snla/mcp_server.py` (stdio transport) |
-| Tests (CI-safe) | `python -m pytest snla/tests/ -v -m "not slow"` (87 tests) |
+| Tests (CI-safe) | `python -m pytest snla/tests/ -v -m "not slow"` (110 tests) |
 | Single test file | `python -m pytest snla/tests/test_server.py -v` |
 | Mock mode | `LLM_MOCK=true` in `.env` — no API key needed |
 | Package | `pyinstaller snla.spec --noconfirm` → `dist/StatsTalk.exe` |
@@ -52,7 +52,7 @@ SKIP_RAG=true               # Disable RAG knowledge base (optional)
 
 ## Test Strategy
 
-- **87 tests** (85 CI-safe + 2 xfail for pre-existing chi-square bug). No SPSS/LLM needed for CI.
+- **110 tests** (108 pass + 2 xfail for pre-existing chi-square bug). No SPSS/LLM needed for CI.
 - New test modules: `test_server.py` (23 Flask API tests), `test_python_backend.py` (24 pingouin tests)
 - `conftest.py` fixtures: `sample_variables`, `mock_spss_output_ttest`, `analysis_result_ttest`, etc.
 - `@pytest.mark.slow` on SPSS-dependent tests — deselect with `-m "not slow"`
@@ -133,7 +133,7 @@ SKIP_RAG=true               # Disable RAG knowledge base (optional)
 ## File organization
 
 ```
-snla/tests/              # 87 tests (10 files)
+snla/tests/              # 110 tests (10 files)
 scripts/                 # Verification, demo, MCP integration test
 data/fixtures/           # test_data.sav, airline.sav (25K), extended, boundary
 docs/                    # user_guide, rename-evaluation, evaluation-and-testing-guide
@@ -152,7 +152,7 @@ snla.spec                # PyInstaller → dist/StatsTalk.exe
 - [x] Phase A-D (13 improvements): edge cases, input sanitization, rate limiting, session persistence, batch variables, non-parametric templates, Python backend tests, RAG pipeline, TLS hardening, config hot-reload, server split
 - [x] Phase E: visualization (charts.py), extended stats (+3 methods), rename → **StatsTalk**
 
-> Test count: **87** | Python: 15 methods | MCP: 7 tools | API: 11 endpoints
+> Test count: **110** (108 pass + 2 xfail) | Python: 15 methods | MCP: 7 tools | API: 11 endpoints
 
 ## Known limitations
 

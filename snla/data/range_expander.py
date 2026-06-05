@@ -6,10 +6,9 @@ Used as a pre-processor before the LLM planner so the LLM never sees
 range syntax — it only sees explicit variable names.
 """
 import re
-from typing import Optional
 
 
-def detect_range_pattern(user_input: str) -> Optional[tuple[str, str, str, str]]:
+def detect_range_pattern(user_input: str) -> tuple[str, str, str, str] | None:
     """Detect variable range patterns in user input.
 
     Returns (prefix, start_num, end_num, suffix) if found, None otherwise.
