@@ -140,29 +140,45 @@ def explain_template(
     mean_diff = details.get("mean_diff")
 
     # ---- Build statistical-value inline string ----------------------------
-    stat_items: list[str] = []
+    stat_items: list[tuple[str, str]] = []
 
     if t_value is not None:
-        stat_items.append(f"t={t_value:.3f}")
+        stat_items.append((f"t={t_value:.3f}", ""))
     if f_value is not None:
-        stat_items.append(f"F={f_value:.3f}")
+        stat_items.append((f"F={f_value:.3f}", ""))
     if chi2_value is not None:
-        stat_items.append(f"χ²={chi2_value:.3f}")
+        stat_items.append((f"χ²={chi2_value:.3f}", ""))
     if details.get("r") is not None and "r_squared" not in details:
-        stat_items.append(f"r={details['r']:.3f}")
+        stat_items.append((f"r={details['r']:.3f}", ""))
+
+    # Mann-Whitney U
+    u_value = details.get("u_value")
+    if u_value is not None:
+        stat_items.append((f"U = {u_value:.2f}", "MWU"))
+    rank_biserial = details.get("rank_biserial")
+    if rank_biserial is not None:
+        stat_items.append((f"秩双列相关系数 = {rank_biserial:.3f}", "MWU"))
+
+    # Kruskal-Wallis H
+    h_value = details.get("h_value")
+    if h_value is not None:
+        stat_items.append((f"H = {h_value:.2f}", "KWH"))
+    eps_squared = details.get("eps_squared")
+    if eps_squared is not None:
+        stat_items.append((f"效应量 ε² = {eps_squared:.3f}", "KWH"))
 
     # Append p-value with comparison operators — but *skip* for
     # EDGE_SIGNIFICANT because the forced_phrase already embeds the
     # p-value in its natural-language message.
     if p_value is not None and significance != "EDGE_SIGNIFICANT":
         if significance == "SIGNIFICANT":
-            stat_items.append(f"p={p_value:.3f}<0.05")
+            stat_items.append((f"p={p_value:.3f}<0.05", ""))
         elif significance == "NOT_SIG":
-            stat_items.append(f"p={p_value:.3f}>0.05")
+            stat_items.append((f"p={p_value:.3f}>0.05", ""))
         else:
-            stat_items.append(f"p={p_value:.3f}")
+            stat_items.append((f"p={p_value:.3f}", ""))
 
-    stat_str = f"（{'，'.join(stat_items)}）" if stat_items else ""
+    stat_str = f"（{'，'.join(s[0] for s in stat_items)}）" if stat_items else ""
 
     # ---- Compose sentences ------------------------------------------------
     sentences: list[str] = []
@@ -181,12 +197,24 @@ def explain_template(
             mean_parts.append(f"均值差为{mean_diff:.1f}")
         sentences.append("，".join(mean_parts) + "。")
 
-    # Effect-size description
+    # Effect-size description (Cohen's d for parametric tests)
     if effect_size_desc:
         if d_value is not None:
             sentences.append(f"{effect_size_desc}（Cohen's d={d_value}）。")
         else:
             sentences.append(f"{effect_size_desc}。")
+
+    # Non-parametric effect size (Mann-Whitney U / Kruskal-Wallis H)
+    stat_type = None
+    for _item_text, item_type in stat_items:
+        if item_type in ("MWU", "KWH"):
+            stat_type = item_type
+            break
+
+    if stat_type == "MWU" and rank_biserial is not None:
+        sentences.append(f"{_interpret_mwu_effect(rank_biserial)}（秩双列相关系数={rank_biserial:.3f}）。")
+    elif stat_type == "KWH" and eps_squared is not None:
+        sentences.append(f"{_interpret_kwh_effect(eps_squared)}（ε²={eps_squared:.3f}）。")
 
     # R² mention (the qualitative assessment is already in forced_phrase,
     # here we add the actual value)
@@ -270,6 +298,18 @@ def build_polish_prompt(
         num_parts.append(f"Cohen's d={d_value}")
     if r_squared is not None:
         num_parts.append(f"R²={r_squared}")
+    u_value = details.get("u_value")
+    if u_value is not None:
+        num_parts.append(f"U={u_value}")
+    h_value = details.get("h_value")
+    if h_value is not None:
+        num_parts.append(f"H={h_value}")
+    rank_biserial = details.get("rank_biserial")
+    if rank_biserial is not None:
+        num_parts.append(f"秩双列相关系数={rank_biserial}")
+    eps_squared = details.get("eps_squared")
+    if eps_squared is not None:
+        num_parts.append(f"ε²={eps_squared}")
 
     facts_lines.append(f"- 具体数值: {', '.join(num_parts)}")
     facts_lines.append(f"- 不允许使用的措辞: {forbidden_str}")
@@ -477,6 +517,14 @@ def _build_details(stats: dict[str, Any]) -> dict[str, Any]:
         "n_valid": "n_valid",
         "n_missing": "n_missing",
         "mean_diff": "mean_diff",
+        # Non-parametric (Mann-Whitney U)
+        "U_val": "u_value",
+        "U-value": "u_value",
+        "U": "u_value",
+        "rank_biserial": "rank_biserial",
+        # Non-parametric (Kruskal-Wallis H)
+        "H": "h_value",
+        "eps_squared": "eps_squared",
     }
     for source_key, target_key in key_map.items():
         val = stats.get(source_key)
@@ -534,6 +582,8 @@ def _analysis_type_label(analysis_type: str) -> str:
         "CORRELATIONS": "相关分析",
         "NONPAR CORR": "非参数相关分析",
         "NPAR TESTS": "非参数检验",
+        "MANN_WHITNEY": "Mann-Whitney U 检验",
+        "KRUSKAL_WALLIS": "Kruskal-Wallis H 检验",
         "MANOVA": "多变量方差分析",
         "GLM": "一般线性模型",
         "LOGISTIC REGRESSION": "逻辑回归分析",
@@ -542,3 +592,40 @@ def _analysis_type_label(analysis_type: str) -> str:
         "CLUSTER": "聚类分析",
     }
     return mapping.get(analysis_type.upper(), f"{analysis_type}分析结果")
+
+
+def _interpret_mwu_effect(rank_biserial: float) -> str:
+    """Interpret rank-biserial correlation effect size for Mann-Whitney U.
+
+    Thresholds (conventional for rₙₐₙₖ₋ₙₐₗ):
+        < 0.1  — negligible
+        0.1–0.3 — small
+        0.3–0.5 — medium
+        ≥ 0.5   — large
+    """
+    r_abs = abs(rank_biserial)
+    if r_abs < 0.1:
+        return "效应极小，两组差异几乎可以忽略"
+    if r_abs < 0.3:
+        return "效应较小，两组存在轻微差异"
+    if r_abs < 0.5:
+        return "效应中等，两组存在明显差异"
+    return "效应较大，两组存在显著差异"
+
+
+def _interpret_kwh_effect(epsilon_squared: float) -> str:
+    """Interpret epsilon-squared effect size for Kruskal-Wallis H.
+
+    Thresholds (conventional for ε²):
+        < 0.01  — negligible
+        0.01–0.06 — small
+        0.06–0.14 — medium
+        ≥ 0.14   — large
+    """
+    if epsilon_squared < 0.01:
+        return "组间差异极小"
+    if epsilon_squared < 0.06:
+        return "组间存在较小差异"
+    if epsilon_squared < 0.14:
+        return "组间存在中等差异"
+    return "组间差异较大"
