@@ -22,7 +22,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 
 from flask import Flask, jsonify, request, send_from_directory
 
-from snla.config import DEBUG, LLM_MOCK
+from snla.config import DEBUG, LLM_MOCK  # noqa: F401 — LLM_MOCK imported for test patching
 from snla.data.persistence import load_session, save_session
 from snla.data.reader import read_and_extract
 from snla.data.sanitizer import filter_for_cloud
