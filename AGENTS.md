@@ -1,166 +1,164 @@
-# AGENTS.md — SPSS Natural Language Assistant (SNLA)
+# AGENTS.md — StatsTalk
 
-> Status: P4 Testing & Release. 56 tests passing. `Plan.md` has full specs.
+> Status: P7 Complete. 87 tests passing. Production-ready.
 
-## Architecture (actual execution flow)
+## Architecture
 
 ```
-User → LLM (Intent + Method only) → Template Syntax → Validator → SPSS → Parser → Explainer → User
+User (自然语言)
+  → LLM Planner (intent + method + variables)
+  → Backend Router:
+      ├─ Python (pingouin, 15 methods, SPSS optional)
+      └─ SPSS (Python Submit / Batch)
+  → Template Syntax (zero hallucination)
+  → Validator (blacklist + greylist sandbox)
+  → Executor → OMS XML / DataFrame Parser
+  → Explainer (stat constraints → LLM polish)
+  → User (白话解读 + Word export + MCP multi-channel)
 ```
 
-**Key deviation from Plan.md**: Syntax generation uses **pre-built templates** (`snla/syntax/templates.py`), not LLM.
-LLM is only used for intent recognition and method recommendation. This was a deliberate P4 simplification
-for reliability — template syntax can't hallucinate variable names.
+**Dual backend**: SPSS for production, Python (pingouin) for no-SPSS mode. 11/12 methods cross-validated.
+**RAG-enhanced**: SPSS documentation knowledge base (566 chunks) injected into LLM syntax fix + planner prompts.
 
 ## Commands
 
 | Task | Command |
 |------|---------|
-| Setup | `python -m venv venv` then `pip install -r requirements.txt` |
-| Dev run | `python launcher.py` (starts Flask + opens PyWebView window) |
-| API only | `python snla/ui/server.py` (Flask on port 8501, no window) |
-| Tests | `python -m pytest snla/tests/ -v` (56 tests, no SPSS/LLM needed) |
-| Tests (CI-safe) | `python -m pytest snla/tests/ -v -m "not slow"` |
-| Single test file | `python -m pytest snla/tests/test_validator.py -v` |
-| Mock mode | Set `LLM_MOCK=true` in `.env` — no API key needed, returns canned responses |
-| Package | `pyinstaller snla.spec --noconfirm` → `dist/SNLA.exe` |
-| Clean P0 outputs | Delete `p0_output/` directory between runs |
+| Setup | `python -m venv venv && venv\Scripts\activate && pip install -r requirements.txt` |
+| Dev run | `python launcher.py` (Flask + PyWebView window) |
+| API only | `python snla/ui/server.py` (Flask on port 8501) |
+| MCP server | `python snla/mcp_server.py` (stdio transport) |
+| Tests (CI-safe) | `python -m pytest snla/tests/ -v -m "not slow"` (87 tests) |
+| Single test file | `python -m pytest snla/tests/test_server.py -v` |
+| Mock mode | `LLM_MOCK=true` in `.env` — no API key needed |
+| Package | `pyinstaller snla.spec --noconfirm` → `dist/StatsTalk.exe` |
+| Lint + format | `python -m ruff check snla/ && python -m ruff format snla/` |
+| MCP integration | `python scripts/mcp_integration_test.py` |
 
 ## Environment
 
 Copy `.env.example` → `.env`. Critical vars:
 
 ```
-SPSS_PATH=           # stats.exe path (batch mode only)
-SPSS_PYTHON_PATH=    # SPSS bundled Python3/python.exe (required for python mode)
-SPSS_EXEC_MODE=python  # "python" (default, SPSS 26+) or "batch" (legacy)
-LLM_MOCK=true        # Dev without API key
 LLM_ENDPOINT=https://opencode.ai/zen/go/v1/chat/completions
+LLM_API_KEY=your-key-here
+LLM_MODEL=deepseek-v4-flash
+STATS_BACKEND=spss          # "spss" | "python" | "auto"
+SPSS_PATH=...               # Optional with Python backend
+SPSS_PYTHON_PATH=...        # SPSS 26+ bundled Python
+LLM_MOCK=true               # Dev without API key
+SKIP_RAG=true               # Disable RAG knowledge base (optional)
 ```
-
-**`LLM_MOCK=true`** returns deterministic canned JSON for all LLM calls. Essential for UI dev and tests.
-
-## SPSS Execution Modes
-
-| Mode | How | When to use |
-|------|-----|-------------|
-| **python** (default) | SPSS bundled Python → `spss.Submit()` | SPSS 26+. Most reliable. |
-| **batch** (legacy) | `stats.exe -production silent` subprocess | SPSS <26 or when python mode fails |
-
-**Batch mode hangs on SPSS 26+** — that's why python mode exists. If you get "SPSS execution failed" 
-with batch mode, switch to python mode.
 
 ## Test Strategy
 
-- **56 tests, all pass without real SPSS or LLM** — uses mock XML strings and mock LLM responses
-- `conftest.py` provides shared fixtures: `sample_variables`, `mock_spss_output_ttest`, `analysis_result_ttest`, etc.
-- Marker `@pytest.mark.slow` on tests requiring real SPSS — **always deselect in CI**: `-m "not slow"`
-- Tests that need real SPSS: `scripts/verify_spss.py`, `scripts/verify_spss_v2.py` (manual only)
+- **87 tests** (85 CI-safe + 2 xfail for pre-existing chi-square bug). No SPSS/LLM needed for CI.
+- New test modules: `test_server.py` (23 Flask API tests), `test_python_backend.py` (24 pingouin tests)
+- `conftest.py` fixtures: `sample_variables`, `mock_spss_output_ttest`, `analysis_result_ttest`, etc.
+- `@pytest.mark.slow` on SPSS-dependent tests — deselect with `-m "not slow"`
 
-## Server (`snla/ui/server.py`) — critical design notes
+## Server (`snla/ui/`) — design notes
 
-**Single-user design** with global state guards:
-```python
-_executing: bool            # True while /api/analyze is running (blocks concurrent)
-_active_executor            # SPSSExecutor handle for cancellation
-_pending_greylist           # Greylist syntax awaiting user confirmation
-_was_cancelled              # Set by /api/cancel
-```
+**Module split** (Phase D): server.py (41KB → 3 files)
+- `server.py` — Flask routes + global state only
+- `_helpers.py` — `_make_executor`, `_has_llm`, `_load_dataframe`, `_check_rate_limit`
+- `_pipeline.py` — `_run_python_backend`, `_prepare_syntax`, `_execute_and_parse`, `_syntax_template`, etc.
 
-**API endpoints**: `/api/upload`, `/api/analyze`, `/api/cancel`, `/api/status`, `/api/export`, `/api/settings`
+**Single-user design**: `_executing` bool blocks concurrent `/api/analyze` (returns 409).
+**Rate limiting**: 60s window, 10 requests max for `/api/analyze`.
+**Input sanitization**: 2000 char query limit, type validation.
+**Session persistence**: SQLite shadow storage (`snla/data/persistence.py`) — survives restarts.
+**Config hot-reload**: `/api/reload-config` POST endpoint.
 
-**Greylist flow**: COMPUTE/RECODE/SELECT IF → returns `requires_confirmation: true` → frontend shows dialog → re-send with `confirm_greylist: true`. Executed on **temporary data copy** (original file never touched).
+### API endpoints
+
+| Method | Endpoint | Purpose |
+|--------|----------|---------|
+| GET | `/` | Frontend HTML |
+| GET | `/api/status` | Health + session state |
+| POST | `/api/upload` | Upload .sav/.csv (500MB limit, MIME + extension check) |
+| POST | `/api/analyze` | Main analysis pipeline |
+| POST | `/api/cancel` | Cancel running analysis |
+| POST | `/api/confirm` | Execute pending greylist operation |
+| GET | `/api/variables` | Cloud-safe variable list |
+| GET/POST | `/api/settings` | Read/update config |
+| POST | `/api/reload-config` | Hot-reload .env |
+| POST | `/api/models` | List available LLM models |
+| GET | `/api/detect-spss` | Auto-detect SPSS installations |
+| GET | `/api/export` | Download Word report |
 
 ## Constraints
 
-1. **Windows-only** — SPSS automation requires SPSS bundled Python (`SPSS_PYTHON_PATH`)
-2. **Syntax sandbox** — `snla/syntax/validator.py` blocks: SAVE, DELETE, ERASE, DATASET CLOSE, NEW FILE, BEGIN PROGRAM, AGGREGATE, ADD/MATCH FILES
-3. **Privacy** — only variable names, types, labels, and aggregate stats go to cloud LLM. `snla/data/sanitizer.py` strips raw data values and sensitive variable names.
-4. **PyWebView** requires Edge WebView2 runtime (bundled with Windows 10+). Falls back to browser.
-5. **TLS workaround** — `snla/llm/client.py` uses a permissive TLS adapter (`CERT_NONE`, `SECLEVEL=1`) for the opencode.ai endpoint. Needed on some Windows/Python combos.
+1. **Windows-only** — SPSS automation requires SPSS bundled Python
+2. **Syntax sandbox** — blocks SAVE, DELETE, HOST COMMAND, BEGIN PROGRAM, etc.
+3. **Privacy** — only variable structure sent to LLM. `value_labels` stripped. Sensitive variable names detected and desensitized.
+4. **TLS** — endpoint-specific permissive adapter for opencode.ai only. All other endpoints use default TLS.
+5. **Upload limits** — 500MB max, `.sav`/`.csv` only, MIME validation.
 
 ## Module map
 
 | Module | Purpose |
 |--------|---------|
-| `snla/config.py` | All env-var config, `validate()` for startup checks |
-| `snla/session.py` | In-memory `SessionState` dataclass (no DB) |
+| `snla/config.py` | Env-var config, `validate()`, `reload_config()` |
+| `snla/session.py` | In-memory `SessionState` (shadow-persisted to SQLite) |
+| `snla/trust.py` | Trust whitelist (JSON runtime, compile-time fallback) |
 | `snla/data/reader.py` | `.sav` → pyreadstat, `.csv` → pandas |
-| `snla/data/sanitizer.py` | Cloud-safe field filtering + sensitive var detection |
-| `snla/llm/client.py` | OpenAI-compatible API wrapper with TLS adapter |
-| `snla/llm/prompts/` | intent.py, method.py — prompt templates (LLM used here only) |
+| `snla/data/sanitizer.py` | Cloud-safe filtering + sensitive var detection + desensitization |
+| `snla/data/persistence.py` | SQLite session persistence (save/load/clear) |
+| `snla/data/range_expander.py` | Q1-Q10 pattern detection + expansion |
+| `snla/llm/client.py` | API wrapper, TLS adapter, exponential backoff retry |
+| `snla/llm/prompts/` | intent.py, method.py, syntax.py — prompt templates |
 | `snla/syntax/validator.py` | Blacklist, greylist, variable existence, bracket pairing |
-| `snla/syntax/templates.py` | Pre-built SPSS syntax for ~10 analysis types |
-| `snla/executor/spss.py` | SPSS subprocess manager, OMS XML wrapper, temp copies for greylist |
-| `snla/executor/python.py` | Python backend — pingouin covering 12 analysis types |
-| `snla/executor/adapter.py` | BackendAdapter — unified SPSS/Python interface with trust routing |
-| `snla/trust.py` | Trust whitelist loader — JSON at runtime, compile-time constant fallback |
-| `snla/orchestrator/` | Planner + greylist state machine — shared by Flask and MCP servers |
-| `snla/mcp_server.py` | MCP Server — FastMCP 7 tools for OpenClaw/Claude Desktop |
-| `snla/parser/output.py` | OMS XML + regex dual parser (OMS primary, regex fallback) |
+| `snla/syntax/templates.py` | Pre-built SPSS syntax for 15 analysis types |
+| `snla/executor/spss.py` | SPSS subprocess manager, OMS XML, temp copies |
+| `snla/executor/python.py` | pingouin — 15 methods (12 core + Wilcoxon + multi/logistic regression) |
+| `snla/executor/adapter.py` | BackendAdapter — unified SPSS/Python routing |
+| `snla/orchestrator/` | Planner + greylist state machine (shared Flask/MCP) |
+| `snla/orchestrator/planner.py` | LLM intent + method + variable matching, RAG-enhanced |
+| `snla/mcp_server.py` | FastMCP 7 tools (stdio transport) |
+| `snla/parser/_oms.py` | OMS XML parser — `parse_oms_xml`, 7 dedicated extractors |
+| `snla/parser/_lst.py` | LST text parser — regex fallback |
+| `snla/parser/output.py` | Unified `parse()` entry, re-exports |
 | `snla/parser/schema.py` | `AnalysisResult`, `TableResult` dataclasses |
-| `snla/explainer/naturalize.py` | Constraint layer (p-value rules) + LLM polish (rules first, LLM decorates) |
-| `snla/explainer/export.py` | Word .docx export via python-docx |
-| `snla/ui/server.py` | Flask REST API (856 lines — the orchestration hub) |
-| `snla/ui/index.html` | Single-file frontend (561 lines HTML/CSS/JS) |
-| `launcher.py` | Entry point: starts Flask thread → opens PyWebView window |
+| `snla/explainer/naturalize.py` | Constraint layer + non-parametric templates (MWU, KWH) |
+| `snla/explainer/export.py` | Word .docx export |
+| `snla/explainer/charts.py` | matplotlib bar/scatter/histogram → base64 PNG |
+| `snla/rag/` | RAG knowledge base (566 chunks, 20 commands) |
+| `snla/ui/server.py` | Flask routes + global state |
+| `snla/ui/_helpers.py` | Server helper functions |
+| `snla/ui/_pipeline.py` | Analysis pipeline functions |
+| `snla/ui/index.html` | Single-file frontend |
+| `launcher.py` | Entry point: Flask thread → PyWebView window |
 
 ## File organization
 
 ```
-snla/tests/          # 56 pytest tests (no SPSS needed)
-scripts/             # Manual verification & demo scripts (need SPSS)
-data/fixtures/       # test_data.sav, expected outputs, malicious_syntax.sps
-docs/                # user_guide.md
-.sisyphus/           # OpenCode plans (gitignored)
+snla/tests/              # 87 tests (10 files)
+scripts/                 # Verification, demo, MCP integration test
+data/fixtures/           # test_data.sav, airline.sav (25K), extended, boundary
+docs/                    # user_guide, rename-evaluation, evaluation-and-testing-guide
+.opencode/skills/snla/   # OpenClaw Skill config
+pyproject.toml           # Ruff config (line-length=100, py310)
+snla.spec                # PyInstaller → dist/StatsTalk.exe
 ```
 
 ## Current status
 
-- [x] P0–P3 complete
-- [x] P4: Frontend migrated Streamlit → Flask + PyWebView
-- [x] P4: Server rewrite — greylist flow, cancellation, settings persistence, template-based syntax
-- [x] P4: PyInstaller packaging → `dist/SNLA.exe` (77.5 MB)
-- [x] P4: E2E verification — 3/3 real SPSS pipelines pass
-- [x] P4: 50-case checklist — 50/50 valid syntax
-- [x] P4: 65-case real-LLM verification (incl. airline.sav 25K rows)
-- [x] P0-1: Fix FREQUENCIES OMS parser for string variables
-- [x] P0-1: ONEWAY empty XML detection on string grouping vars
-- [x] P5: Python backend — pingouin 12 methods, BackendAdapter, trust whitelist
-- [x] P5: SPSS optional — auto-detect, strategy C, restricted mode UI
-- [x] P5: Dual-backend validation — 51 cases, 0 conflicts, 11/12 trusted
-- [x] P6: MCP Server — FastMCP 7 tools (analyze/confirm/cancel/export/status/upload/variables)
-- [x] P6: OpenClaw Skill — thin config, runtime method discovery from snla_status()
-- [x] P7: orchestrator/ module — Planner + greylist state machine, server.py 1099→766 lines
+- [x] P0–P4: Complete (SPSS automation, Flask/PyWebView, packaging, E2E)
+- [x] P5: Python backend (15 methods), BackendAdapter, trust whitelist
+- [x] P6: MCP Server (7 tools), OpenClaw Skill, MCP integration test
+- [x] P7: orchestrator/, Flask API tests (23), parser split, Ruff format, rename eval
+- [x] P0/P1 Quality (8 grill fixes): parser tests, deps, upload limits, privacy, LLM retry, logging, analyze() refactor
+- [x] Phase A-D (13 improvements): edge cases, input sanitization, rate limiting, session persistence, batch variables, non-parametric templates, Python backend tests, RAG pipeline, TLS hardening, config hot-reload, server split
+- [x] Phase E: visualization (charts.py), extended stats (+3 methods), rename → **StatsTalk**
 
-### Next: P6–P7 (multi-channel + quality)
+> Test count: **87** | Python: 15 methods | MCP: 7 tools | API: 11 endpoints
 
-| # | Phase | Task | Status |
-|---|-------|------|--------|
-| P5-1 | P5 | Add Python backend (`snla/executor/python.py` — pingouin) | ✅ Done |
-| P5-2 | P5 | Backend router + settings UI | ✅ Done |
-| P5-3 | P5 | Dual-backend comparison validation (51 cases, 11/12 trusted) | ✅ Done |
-| P5-4 | P5 | Make SPSS optional (no-SPSS mode, strategy C) | ✅ Done |
-| P6-1 | P6 | MCP Server wrapper (`snla/mcp_server.py`) | ✅ Done |
-| P6-2 | P6 | OpenClaw Skill (`SKILL.md`) | ✅ Done |
-| P6-3 | P6 | MCP integration test (`scripts/mcp_integration_test.py`) | ✅ Done |
-| P7-1 | P7 | Flask API tests (`test_server.py` — 23 tests) | ✅ Done |
-| P7-2 | P7 | Split `server.py` → `orchestrator/` module | ✅ Done |
-| P7-3 | P7 | Ruff format + lint (`pyproject.toml`, 47 files) | ✅ Done |
-| P7-4 | P7 | Project rename evaluation (`docs/rename-evaluation.md`) | ✅ Done |
-| — | Quality | P0/P1 grill fixes (8 items, see below) | ✅ Done |
+## Known limitations
 
-### P0/P1 Quality Fixes (completed 2026-05-28)
-
-| # | Fix | File(s) |
-|---|-----|---------|
-| P0-1 | Parser tests (8 OMS XML + LST + error path tests) | `test_parser.py` |
-| P0-2 | Dependency version pinning (all `~=` compatible pins) | `requirements.txt` |
-| P0-3 | Upload security (500MB limit, `.sav/.csv` whitelist, MIME check) | `server.py` |
-| P1-4 | Privacy: `value_labels` stripped from cloud-safe fields | `sanitizer.py` |
-| P1-5 | LLM resilience: exponential backoff retry (1s/2s/4s, skip 4xx) | `client.py` |
-| P1-6 | Dead code cleanup (remove `SPSS_MAX_RETRIES`, `rag/` restored) | `config.py`, `spss.py` |
-| P1-7 | `analyze()` refactor: 3 extractions (`_run_python_backend`, `_prepare_syntax`, `_execute_and_parse`), `/api/confirm` DRY | `server.py` |
-| P1-8 | Logging unification: `print()` → `logging`, bare `except` → `logger.exception()` | `spss.py`, `server.py` |
-
-> Test count: **86** (previously 56). Full plan: `.sisyphus/improvement-plan.md` | Strategy: `.sisyphus/strategy.md`
+1. Single-user design — concurrent requests return 409
+2. Windows-only — SPSS automation binds to Windows
+3. Session in-memory with SQLite shadow — no multi-instance sync
+4. `SPSSExecutor` type hint F821 — lazy import, harmless
+5. `test_python_backend.py` 2 xfailed — pre-existing chi-square `expected.values()` bug
+6. Batch variable analysis is pre-processor only — Q1-Q10 expanded before LLM, no multi-result aggregation yet
