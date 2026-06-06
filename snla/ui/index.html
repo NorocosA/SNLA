@@ -678,19 +678,8 @@ document.getElementById("s-spss-select").addEventListener("change", (e) => {
         const statusResp = await fetch("/api/status");
         const status = await statusResp.json();
         
-        // Hide welcome if data already loaded (restored session or demo)
-        if (status.has_data) {
-            hasData = true;
-            userInput.disabled = false;
-            sendBtn.disabled = false;
-            hideWelcome();
-            // Restore variable list from session
-            const varResp = await fetch("/api/variables");
-            const varData = await varResp.json();
-            if (varData.variables) {
-                renderVariables(varData.variables, varData.row_count);
-            }
-        }
+        // Note: session persistence restores data for backend use,
+        // but UI waits for explicit user upload or Demo click.
         
         const backendSelect = document.getElementById("s-backend");
         const notice = document.getElementById("backend-notice");
