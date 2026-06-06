@@ -227,7 +227,7 @@ def analyze():
     try:
         from snla.data.range_expander import expand_query
 
-        var_names = [v["name"] for v in session.variables]
+        var_names = [v.get("name", "") for v in session.variables if v.get("name")]
         expanded = expand_query(user_input, var_names)
         if expanded != user_input:
             logger.info("Range expanded: %s → %s", user_input, expanded)
